@@ -260,7 +260,7 @@ function Hero() {
         </div>
 
         <div className="hero-visual" aria-label="Mujer usando Kiryus BioShield">
-          <img src="/assets/hero-wellness.jpg" alt="Persona usando Kiryus BioShield" />
+          <img src="/assets/hero-wellness.png" alt="Persona usando Kiryus BioShield" />
           <div className="frequency-rings" aria-hidden="true" />
           <Brand compact />
         </div>
@@ -329,7 +329,7 @@ function Technology() {
     <section className="technology-section" id="tecnologia">
       <div className="container technology-grid">
         <div className="product-showcase">
-          <img src="/assets/bioshield-layers.jpg" alt="Capas internas de Kiryus BioShield" />
+          <img src="/assets/bioshield-layers.png" alt="Capas internas de Kiryus BioShield" />
           <div className="badge">
             Tecnologia
             <strong>Neuroambiental</strong>
@@ -383,7 +383,7 @@ function Technology() {
             <strong>Founder</strong>
             <p>Solo 100 unidades en el mundo</p>
           </div>
-          <img src="/assets/founder-kit.jpg" alt="Kit fundador Kiryus BioShield" />
+          <img src="/assets/founder-kit.png" alt="Kit fundador Kiryus BioShield" />
           <div className="price-copy">
             <span className="future-price">Precio futuro <s>$147.000</s></span>
             <span>Precio Fundador</span>

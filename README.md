@@ -11,7 +11,7 @@ npm run build
 npm start
 ```
 
-El boton principal de contacto usa el placeholder de Telegram `https://t.me/usuario_o_bot`.
+El boton principal de contacto usa el bot de Telegram `https://t.me/Kiryusbot`.
 
 ## Seenode
 

@@ -24,7 +24,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-const telegramUrl = 'https://t.me/usuario_o_bot';
+const telegramUrl = 'https://t.me/Kiryusbot';
 
 const navItems = [
   { label: 'Beneficios', href: '#beneficios' },

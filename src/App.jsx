@@ -467,7 +467,13 @@ function Testimonials() {
 }
 
 function FAQ() {
-  const [openIndex, setOpenIndex] = useState(0);
+  const [openItems, setOpenItems] = useState(() => faqs.map((_, index) => index));
+
+  const toggleFaq = (index) => {
+    setOpenItems((items) =>
+      items.includes(index) ? items.filter((item) => item !== index) : [...items, index],
+    );
+  };
 
   return (
     <section className="faq-section" id="faq">
@@ -475,13 +481,13 @@ function FAQ() {
         <h2>Preguntas frecuentes</h2>
         <div className="faq-grid">
           {faqs.map((item, index) => {
-            const isOpen = openIndex === index;
+            const isOpen = openItems.includes(index);
             return (
               <article className={`faq-item ${isOpen ? 'is-open' : ''}`} key={item.question}>
                 <button
                   type="button"
                   aria-expanded={isOpen}
-                  onClick={() => setOpenIndex(isOpen ? -1 : index)}
+                  onClick={() => toggleFaq(index)}
                 >
                   <span>{item.question}</span>
                   <ChevronDown size={18} aria-hidden="true" />

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  AlertCircle,
   Award,
   BatteryLow,
   BookOpenCheck,
@@ -7,9 +8,12 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  CreditCard,
   Flower2,
   HeartPulse,
+  LoaderCircle,
   LockKeyhole,
+  Mail,
   Menu,
   Music,
   PackageCheck,
@@ -19,10 +23,13 @@ import {
   Smartphone,
   Sparkles,
   Star,
+  UserRound,
   UsersRound,
   X,
   Zap,
 } from 'lucide-react';
+import { createPayment, fetchPaymentStatus } from './api.js';
+import { useAvailability } from './useAvailability.js';
 
 const telegramUrl = 'https://t.me/Kiryusbot';
 
@@ -187,21 +194,27 @@ function Brand({ compact = false }) {
   );
 }
 
-function CtaButton({ children, className = '', size = 'default' }) {
+function CtaButton({
+  children,
+  className = '',
+  disabled = false,
+  onClick,
+  size = 'default',
+}) {
   return (
-    <a
+    <button
+      type="button"
       className={`cta-button ${size === 'large' ? 'cta-button--large' : ''} ${className}`}
-      href={telegramUrl}
-      target="_blank"
-      rel="noreferrer"
+      disabled={disabled}
+      onClick={onClick}
     >
-      <Send size={size === 'large' ? 24 : 18} strokeWidth={2.2} />
+      <CreditCard size={size === 'large' ? 24 : 18} strokeWidth={2.2} />
       <span>{children}</span>
-    </a>
+    </button>
   );
 }
 
-function Header() {
+function Header({ onCheckout, soldOut }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const closeMenu = () => setMenuOpen(false);
@@ -218,10 +231,15 @@ function Header() {
           ))}
         </nav>
         <div className="header-actions">
-          <a className="reserve-link" href={telegramUrl} target="_blank" rel="noreferrer">
-            Reservar mi unidad
+          <button
+            className="reserve-link"
+            type="button"
+            disabled={soldOut}
+            onClick={onCheckout}
+          >
+            {soldOut ? 'Agotado' : 'Reservar mi unidad'}
             <small>Edicion limitada</small>
-          </a>
+          </button>
           <button
             className="menu-toggle"
             type="button"
@@ -237,7 +255,7 @@ function Header() {
   );
 }
 
-function Hero() {
+function Hero({ onCheckout, soldOut }) {
   return (
     <section className="hero-section" id="inicio">
       <div className="container hero-grid">
@@ -252,7 +270,9 @@ function Hero() {
             Disenado para ayudarte a reducir la sobreestimulacion digital, mejorar tu enfoque y crear
             un estado de coherencia mente-cuerpo.
           </p>
-          <CtaButton size="large">Contactanos por Telegram</CtaButton>
+          <CtaButton disabled={soldOut} onClick={onCheckout} size="large">
+            {soldOut ? 'Actualmente agotado' : 'Reservar mi unidad'}
+          </CtaButton>
           <p className="secure-note">
             <LockKeyhole size={14} />
             Compra 100% segura
@@ -324,7 +344,7 @@ function MindShift() {
   );
 }
 
-function Technology() {
+function Technology({ counter, onCheckout, soldOut }) {
   return (
     <section className="technology-section" id="tecnologia">
       <div className="container technology-grid">
@@ -383,7 +403,11 @@ function Technology() {
           <div className="price-top">
             <span>Edicion</span>
             <strong>Founder</strong>
-            <p>Solo 100 unidades en el mundo</p>
+            <p>
+              {counter
+                ? `Solo ${counter.totalQuantity} unidades en el mundo`
+                : 'Oferta limitada'}
+            </p>
           </div>
           <img src="/assets/founder-kit.png" alt="Kit fundador Kiryus BioShield" />
           <div className="price-copy">
@@ -391,7 +415,9 @@ function Technology() {
             <span>Precio Fundador</span>
             <strong>$97</strong>
           </div>
-          <CtaButton className="price-cta">Primeras 30 unidades $79</CtaButton>
+          <CtaButton className="price-cta" disabled={soldOut} onClick={onCheckout}>
+            {soldOut ? 'Sin unidades disponibles' : 'Comprar ahora por $79'}
+          </CtaButton>
           <p className="shipping">
             <PackageCheck size={15} />
             Envio gratis a todo el pais
@@ -402,7 +428,55 @@ function Technology() {
   );
 }
 
-function UrgencyBand() {
+function AvailabilityCounter({ counter, error, loading }) {
+  if (loading && !counter) {
+    return (
+      <div className="stock-counter stock-counter--status" aria-live="polite">
+        <LoaderCircle className="is-spinning" aria-hidden="true" />
+        <p>Consultando disponibilidad</p>
+      </div>
+    );
+  }
+
+  if (!counter) {
+    return (
+      <div className="stock-counter stock-counter--status" aria-live="polite">
+        <AlertCircle aria-hidden="true" />
+        <p>{error || 'Disponibilidad temporalmente no disponible'}</p>
+      </div>
+    );
+  }
+
+  const progress = counter.totalQuantity
+    ? Math.min(100, Math.round((counter.soldCount / counter.totalQuantity) * 100))
+    : 100;
+  const digits = String(counter.remainingCount).split('');
+
+  return (
+    <div className="stock-counter" aria-live="polite">
+      <span>Oferta limitada</span>
+      <strong aria-label={`${counter.remainingCount} unidades disponibles`}>
+        {digits.map((digit, index) => (
+          <b key={`${digit}-${index}`}>{digit}</b>
+        ))}
+      </strong>
+      <p>Unidades disponibles</p>
+      <div
+        className="availability-progress"
+        aria-label={`${counter.soldCount} vendidos de ${counter.totalQuantity}`}
+      >
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <small>
+        Vendidos: {counter.soldCount} / Total: {counter.totalQuantity}
+      </small>
+    </div>
+  );
+}
+
+function UrgencyBand({ availability }) {
+  const { counter } = availability;
+
   return (
     <section className="urgency-band" aria-label="Disponibilidad limitada">
       <div className="container urgency-grid">
@@ -410,17 +484,12 @@ function UrgencyBand() {
           <UsersRound aria-hidden="true" />
           <p>
             Unete a los primeros
-            <strong>100 fundadores</strong>
+            <strong>
+              {counter ? `${counter.totalQuantity} fundadores` : 'Edicion limitada'}
+            </strong>
           </p>
         </div>
-        <div className="stock-counter">
-          <span>Esta edicion no volvera a estar disponible</span>
-          <strong>
-            <b>7</b>
-            <b>1</b>
-          </strong>
-          <p>Unidades disponibles</p>
-        </div>
+        <AvailabilityCounter {...availability} />
         <div className="urgency-item urgency-item--right">
           <Clock3 aria-hidden="true" />
           <p>
@@ -504,7 +573,7 @@ function FAQ() {
   );
 }
 
-function FooterCta() {
+function FooterCta({ onCheckout, soldOut }) {
   return (
     <footer className="footer-cta">
       <div className="container footer-grid">
@@ -524,7 +593,9 @@ function FooterCta() {
           <strong>Esta es tu era. Vive en coherencia.</strong>
         </div>
         <div className="footer-action">
-          <CtaButton size="large">Reservar por Telegram</CtaButton>
+          <CtaButton disabled={soldOut} onClick={onCheckout} size="large">
+            {soldOut ? 'Actualmente agotado' : 'Reservar y pagar'}
+          </CtaButton>
           <p>
             <LockKeyhole size={14} />
             Pago 100% seguro
@@ -536,19 +607,352 @@ function FooterCta() {
   );
 }
 
+function CheckoutModal({ availability, onClose, open }) {
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape' && !submitting) onClose();
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [onClose, open, submitting]);
+
+  if (!open) return null;
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+
+    if (!name.trim()) {
+      setError('Ingresa tu nombre.');
+      return;
+    }
+
+    if (!email.trim()) {
+      setError('Ingresa tu correo electrónico.');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const latestCounter = await availability.refresh();
+
+      if (!latestCounter) {
+        setError('No pudimos verificar la disponibilidad. Inténtalo nuevamente.');
+        return;
+      }
+
+      if (latestCounter.remainingCount <= 0) {
+        setError('Actualmente no hay cupos disponibles.');
+        return;
+      }
+
+      const payment = await createPayment({ email, name });
+      localStorage.setItem('paymentId', payment.paymentId);
+      window.location.assign(payment.url);
+    } catch (requestError) {
+      setError(requestError.message || 'No se pudo iniciar el pago.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const soldOut = availability.counter?.remainingCount <= 0;
+
+  return (
+    <div
+      className="checkout-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !submitting) onClose();
+      }}
+    >
+      <section
+        aria-labelledby="checkout-title"
+        aria-modal="true"
+        className="checkout-modal"
+        role="dialog"
+      >
+        <button
+          aria-label="Cerrar formulario de pago"
+          className="checkout-close"
+          disabled={submitting}
+          type="button"
+          onClick={onClose}
+        >
+          <X size={20} />
+        </button>
+
+        <div className="checkout-heading">
+          <img src="/assets/kiryus-logo.png" alt="" />
+          <div>
+            <span>Edición Founder</span>
+            <h2 id="checkout-title">Reserva tu Kiryus BioShield</h2>
+          </div>
+        </div>
+
+        <p className="checkout-intro">
+          Completa tus datos. Crearemos tu reserva y te enviaremos al pago seguro de Stripe.
+        </p>
+
+        {availability.counter && (
+          <div className="checkout-availability">
+            <strong>{availability.counter.remainingCount}</strong>
+            <span>unidades disponibles de {availability.counter.totalQuantity}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <label>
+            Nombre
+            <span className="input-shell">
+              <UserRound size={18} aria-hidden="true" />
+              <input
+                autoComplete="name"
+                maxLength={120}
+                name="name"
+                placeholder="Tu nombre"
+                required
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </span>
+          </label>
+          <label>
+            Correo electrónico
+            <span className="input-shell">
+              <Mail size={18} aria-hidden="true" />
+              <input
+                autoComplete="email"
+                maxLength={320}
+                name="email"
+                placeholder="correo@ejemplo.com"
+                required
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </span>
+          </label>
+
+          {error && (
+            <p className="form-error" role="alert">
+              <AlertCircle size={17} aria-hidden="true" />
+              {error}
+            </p>
+          )}
+
+          <button className="checkout-submit" disabled={submitting || soldOut} type="submit">
+            {submitting ? (
+              <LoaderCircle className="is-spinning" size={20} aria-hidden="true" />
+            ) : (
+              <CreditCard size={20} aria-hidden="true" />
+            )}
+            {soldOut
+              ? 'Actualmente no hay cupos'
+              : submitting
+                ? 'Preparando pago seguro'
+                : 'Continuar a pago seguro'}
+          </button>
+        </form>
+
+        <div className="checkout-trust">
+          <span>
+            <LockKeyhole size={15} aria-hidden="true" />
+            Pago procesado por Stripe
+          </span>
+          <a href={telegramUrl} rel="noreferrer" target="_blank">
+            <Send size={15} aria-hidden="true" />
+            Soporte por Telegram
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SuccessPage() {
+  const availability = useAvailability();
+  const [payment, setPayment] = useState(null);
+  const [phase, setPhase] = useState('checking');
+  const [paymentId] = useState(() => {
+    const queryId = new URLSearchParams(window.location.search).get('paymentId');
+    return queryId || localStorage.getItem('paymentId') || '';
+  });
+
+  useEffect(() => {
+    if (!paymentId) {
+      setPhase('missing');
+      return undefined;
+    }
+
+    let active = true;
+    let timer;
+    const startedAt = Date.now();
+
+    const checkPayment = async () => {
+      try {
+        const nextPayment = await fetchPaymentStatus(paymentId);
+        if (!active) return;
+
+        setPayment(nextPayment);
+
+        if (nextPayment.status === 'paid') {
+          setPhase('paid');
+          availability.refresh();
+          return;
+        }
+
+        const timedOut = Date.now() - startedAt >= 60_000;
+        setPhase(timedOut ? 'pending-timeout' : 'pending');
+
+        if (!timedOut) {
+          timer = window.setTimeout(checkPayment, 4_000);
+        }
+      } catch (requestError) {
+        if (!active) return;
+        setPhase(requestError.status === 404 ? 'not-found' : 'error');
+      }
+    };
+
+    checkPayment();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [availability.refresh, paymentId]);
+
+  const statusContent = {
+    checking: {
+      icon: <LoaderCircle className="is-spinning" aria-hidden="true" />,
+      title: 'Verificando pago...',
+      copy: 'Estamos esperando la confirmación segura de Stripe.',
+    },
+    pending: {
+      icon: <Clock3 aria-hidden="true" />,
+      title: 'Verificando pago...',
+      copy: 'Tu pago todavía está pendiente. Esta página se actualizará automáticamente.',
+    },
+    'pending-timeout': {
+      icon: <Clock3 aria-hidden="true" />,
+      title: 'Aún no se confirmó el pago',
+      copy: 'La confirmación puede tardar unos minutos. Puedes volver a consultar más tarde.',
+    },
+    paid: {
+      icon: <CheckCircle2 aria-hidden="true" />,
+      title: 'Pago confirmado correctamente',
+      copy: 'Tu unidad Founder quedó registrada. Te contactaremos con los siguientes pasos.',
+    },
+    missing: {
+      icon: <AlertCircle aria-hidden="true" />,
+      title: 'No encontramos una reserva reciente',
+      copy: 'Inicia el pago desde la landing para poder verificar tu reserva.',
+    },
+    'not-found': {
+      icon: <AlertCircle aria-hidden="true" />,
+      title: 'Pago no encontrado',
+      copy: 'No pudimos localizar esta reserva. Contacta soporte si realizaste el pago.',
+    },
+    error: {
+      icon: <AlertCircle aria-hidden="true" />,
+      title: 'No pudimos verificar el pago',
+      copy: 'Inténtalo nuevamente en unos minutos o contacta soporte.',
+    },
+  }[phase];
+
+  return (
+    <main className="success-page">
+      <section className={`success-panel success-panel--${phase}`}>
+        <Brand />
+        <div className="success-status-icon">{statusContent.icon}</div>
+        <p className="eyebrow">Estado de tu reserva</p>
+        <h1>{statusContent.title}</h1>
+        <p>{statusContent.copy}</p>
+
+        {payment && (
+          <dl className="payment-summary">
+            <div>
+              <dt>Nombre</dt>
+              <dd>{payment.name || 'No informado'}</dd>
+            </div>
+            <div>
+              <dt>Correo</dt>
+              <dd>{payment.email}</dd>
+            </div>
+            <div>
+              <dt>Estado</dt>
+              <dd>{payment.status === 'paid' ? 'Pagado' : 'Pendiente'}</dd>
+            </div>
+          </dl>
+        )}
+
+        {phase === 'paid' && availability.counter && (
+          <p className="success-counter">
+            Disponibles: <strong>{availability.counter.remainingCount}</strong> · Vendidos:{' '}
+            <strong>{availability.counter.soldCount}</strong>
+          </p>
+        )}
+
+        <div className="success-actions">
+          <a className="cta-button" href="/">
+            Volver a la landing
+          </a>
+          <a className="support-link" href={telegramUrl} rel="noreferrer" target="_blank">
+            <Send size={17} aria-hidden="true" />
+            Soporte por Telegram
+          </a>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export default function App() {
+  const isSuccessPage = window.location.pathname.replace(/\/+$/, '') === '/success';
+  const availability = useAvailability({ enabled: !isSuccessPage });
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+
+  if (isSuccessPage) {
+    return <SuccessPage />;
+  }
+
+  const soldOut = availability.counter?.remainingCount <= 0;
+
   return (
     <>
-      <Header />
+      <Header onCheckout={() => setCheckoutOpen(true)} soldOut={soldOut} />
       <main>
-        <Hero />
+        <Hero onCheckout={() => setCheckoutOpen(true)} soldOut={soldOut} />
         <MindShift />
-        <Technology />
-        <UrgencyBand />
+        <Technology
+          counter={availability.counter}
+          onCheckout={() => setCheckoutOpen(true)}
+          soldOut={soldOut}
+        />
+        <UrgencyBand availability={availability} />
         <Testimonials />
         <FAQ />
       </main>
-      <FooterCta />
+      <FooterCta onCheckout={() => setCheckoutOpen(true)} soldOut={soldOut} />
+      <CheckoutModal
+        availability={availability}
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+      />
     </>
   );
 }

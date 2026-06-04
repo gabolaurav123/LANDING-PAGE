@@ -1,22 +1,62 @@
 # Kiryus BioShield Landing Page
 
-Landing page responsive para la preventa de Kiryus BioShield, construida con Vite, React y CSS.
+Landing full-stack para la preventa de Kiryus BioShield. El frontend usa Vite y React; Express
+sirve el build y expone las rutas de pago, webhook y disponibilidad respaldadas por Neon
+PostgreSQL.
 
 ## Comandos
 
 ```bash
 npm install
 npm run dev
+npm run dev:server
 npm run build
+npm test
 npm start
 ```
 
-El boton principal de contacto usa el bot de Telegram `https://t.me/Kiryusbot`.
+En desarrollo, ejecuta `npm run dev:server` y `npm run dev` en terminales separadas. Vite envía
+las llamadas `/api` al backend local en el puerto `3000`.
+
+## Variables de entorno
+
+Copia `.env.example` a `.env` solo para desarrollo local. Nunca confirmes `.env` en Git.
+
+```dotenv
+DATABASE_URL=
+STRIPE_PAYMENT_LINK=
+STRIPE_WEBHOOK_SECRET=
+FRONTEND_URL=
+VITE_API_URL=
+PORT=3000
+INITIAL_TOTAL_QUANTITY=100
+```
+
+El servidor crea las tablas y el contador `main` automáticamente al arrancar. También puedes
+ejecutar la migración manualmente con `npm run db:migrate`.
+
+## Stripe
+
+Configura el webhook para escuchar únicamente `checkout.session.completed`:
+
+```text
+https://web-zfki2flrsauw.up-de-fra1-k8s-1.apps.run-on-seenode.com/api/stripe-webhook
+```
+
+En el Payment Link de Stripe, configura el comportamiento posterior al pago para redirigir a:
+
+```text
+https://web-zfki2flrsauw.up-de-fra1-k8s-1.apps.run-on-seenode.com/success
+```
+
+La página `/success` no confía en la redirección para marcar un pago como completado. Consulta el
+estado real guardado por el webhook.
 
 ## Seenode
 
-Usa esta configuracion de Web Service:
-
 - Build Command: `npm install && npm run build`
 - Start Command: `npm start`
-- Port: `80`
+- Port: `3000`
+
+Agrega en Seenode todas las variables listadas en `.env.example`. Los secretos de Neon y Stripe
+deben existir únicamente en las variables de entorno del Web Service.

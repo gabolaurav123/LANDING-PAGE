@@ -473,28 +473,44 @@ img {
   position: absolute;
   left: 8px;
   bottom: 34px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   width: 118px;
   height: 118px;
+  padding: 16px 13px;
   border: 1px solid var(--gold);
   border-radius: 50%;
   background: rgba(6, 6, 6, 0.82);
   color: var(--white);
-  font-size: 0.68rem;
   font-weight: 800;
-  line-height: 1.16;
+  line-height: 1.08;
   text-align: center;
   text-transform: uppercase;
+  overflow: hidden;
 }
 
 .badge strong {
-  display: block;
+  display: grid;
+  gap: 2px;
   color: var(--gold-soft);
+  font-size: 0.5rem;
+  line-height: 1.08;
+  max-width: 98px;
 }
 
-.badge span {
+.badge strong span {
+  display: block;
+  white-space: nowrap;
+}
+
+.badge-stars {
+  display: block;
+  margin-top: 5px;
   color: var(--gold-soft);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
 }
 
 .tech-copy h2,
@@ -891,7 +907,7 @@ img {
 }
 
 .faq-item.is-open p {
-  max-height: 120px;
+  max-height: 160px;
   padding-bottom: 16px;
 }
 

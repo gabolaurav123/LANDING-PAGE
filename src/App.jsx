@@ -156,20 +156,20 @@ const testimonials = [
 
 const faqs = [
   {
-    question: 'Cuando recibire mi Kiryus BioShield?',
-    answer: 'Las entregas comienzan 25 a 40 dias despues del cierre de preventa.',
+    question: '¿Cuándo recibiré mi Kiryus BioShield?',
+    answer: 'Las entregas comienzan 25 a 40 días después del cierre de preventa.',
   },
   {
-    question: 'Es comodo para uso diario?',
-    answer: 'Si. Esta disenado con materiales premium, livianos y transpirables.',
+    question: '¿Es cómodo para uso diario?',
+    answer: 'Sí. Está diseñado con materiales premium, livianos y transpirables.',
   },
   {
-    question: 'Como se lava?',
-    answer: 'Lavado a mano con agua fria y jabon neutro. Secar a la sombra.',
+    question: '¿Cómo se lava?',
+    answer: 'Lavado a mano con agua fría y jabón neutro. Secar a la sombra.',
   },
   {
-    question: 'Tiene garantia?',
-    answer: 'Si, garantia de 30 dias por defectos de fabricacion.',
+    question: '¿Tiene garantía?',
+    answer: 'Sí, garantía de 30 días por defectos de fabricación.',
   },
 ];
 
@@ -331,10 +331,12 @@ function Technology() {
         <div className="product-showcase">
           <img src="/assets/bioshield-layers.png" alt="Capas internas de Kiryus BioShield" />
           <div className="badge">
-            Tecnologia
-            <strong>Neuroambiental</strong>
-            Avanzada
-            <span>*****</span>
+            <strong>
+              <span>Tecnología</span>
+              <span>Neuroambiental</span>
+              <span>Avanzada</span>
+            </strong>
+            <span className="badge-stars">*****</span>
           </div>
         </div>
 
@@ -385,11 +387,11 @@ function Technology() {
           </div>
           <img src="/assets/founder-kit.png" alt="Kit fundador Kiryus BioShield" />
           <div className="price-copy">
-            <span className="future-price">Precio futuro <s>$147.000</s></span>
+            <span className="future-price">Precio futuro <s>$147</s></span>
             <span>Precio Fundador</span>
-            <strong>$97.000</strong>
+            <strong>$97</strong>
           </div>
-          <CtaButton className="price-cta">Primeras 30 unidades $79.000</CtaButton>
+          <CtaButton className="price-cta">Primeras 30 unidades $79</CtaButton>
           <p className="shipping">
             <PackageCheck size={15} />
             Envio gratis a todo el pais

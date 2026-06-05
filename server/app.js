@@ -3,12 +3,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
-import { getConfig } from './config.js';
+import { getConfig, getSafePublicUrl } from './config.js';
 import {
   buildPaymentLinkUrl,
   completePaidPayment,
   createPendingPayment,
   getCounterState,
+  getFounderAccessPayment,
   getPaymentStatus,
   normalizeEmail,
   normalizeName,
@@ -126,6 +127,37 @@ export function createApp() {
     }
 
     response.json(payment);
+  });
+
+  app.get('/api/founder-access/:id', async (request, response) => {
+    if (!validPaymentId(request.params.id)) {
+      response.status(404).json({ error: 'Pago no encontrado' });
+      return;
+    }
+
+    response.set('Cache-Control', 'no-store');
+    const payment = await getFounderAccessPayment(request.params.id);
+
+    if (!payment) {
+      response.status(404).json({ error: 'Pago no encontrado' });
+      return;
+    }
+
+    if (payment.status !== 'paid') {
+      response.status(403).json({
+        error: 'Contenido disponible solo para pagos confirmados',
+      });
+      return;
+    }
+
+    const contentUrl = getSafePublicUrl(config.founderContentUrl);
+    const telegramUrl = getSafePublicUrl(config.telegramBotUrl) || 'https://t.me/Kiryusbot';
+
+    response.json({
+      contentConfigured: Boolean(contentUrl),
+      contentUrl: contentUrl || null,
+      telegramUrl,
+    });
   });
 
   app.use('/api', (_request, response) => {

@@ -51,3 +51,9 @@ export function fetchPaymentStatus(paymentId) {
     cache: 'no-store',
   });
 }
+
+export function fetchFounderAccess(paymentId) {
+  return apiRequest(`/api/founder-access/${encodeURIComponent(paymentId)}`, {
+    cache: 'no-store',
+  });
+}

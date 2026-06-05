@@ -28,7 +28,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { createPayment, fetchPaymentStatus } from './api.js';
+import { createPayment, fetchFounderAccess, fetchPaymentStatus } from './api.js';
 import { useAvailability } from './useAvailability.js';
 
 const telegramUrl = 'https://t.me/Kiryusbot';
@@ -416,7 +416,7 @@ function Technology({ counter, onCheckout, soldOut }) {
             <strong>$97</strong>
           </div>
           <CtaButton className="price-cta" disabled={soldOut} onClick={onCheckout}>
-            {soldOut ? 'Sin unidades disponibles' : 'Comprar ahora por $79'}
+            {soldOut ? 'Sin unidades disponibles' : 'Primeras 30 unidades 79 dólares'}
           </CtaButton>
           <p className="shipping">
             <PackageCheck size={15} />
@@ -785,8 +785,75 @@ function CheckoutModal({ availability, onClose, open }) {
   );
 }
 
+function FounderAccessPanel({ access, error }) {
+  const accessPending = !access && !error;
+  const telegramAccessUrl = access?.telegramUrl || telegramUrl;
+
+  return (
+    <section className="founder-access" aria-labelledby="founder-access-title">
+      <p className="eyebrow">Contenido Founder</p>
+      <h2 id="founder-access-title">Tu kit digital está listo</h2>
+      <p>
+        Accede a la guía digital para alinear mente y corazón, los audios Neurofocus y el bot de
+        Telegram para continuar tu proceso.
+      </p>
+
+      <div className="founder-access-grid">
+        <article>
+          <BookOpenCheck aria-hidden="true" />
+          <div>
+            <h3>Guía digital</h3>
+            <p>Método Coherencia Kiryus para alinear mente y corazón.</p>
+          </div>
+        </article>
+        <article>
+          <Music aria-hidden="true" />
+          <div>
+            <h3>Audios Neurofocus</h3>
+            <p>Meditaciones y frecuencias para enfoque, calma y descanso.</p>
+          </div>
+        </article>
+      </div>
+
+      {accessPending && (
+        <p className="founder-access-status">
+          <LoaderCircle className="is-spinning" size={17} aria-hidden="true" />
+          Preparando tus enlaces privados...
+        </p>
+      )}
+
+      {error && (
+        <p className="founder-access-status founder-access-status--error">
+          <AlertCircle size={17} aria-hidden="true" />
+          {error}
+        </p>
+      )}
+
+      <div className="founder-access-actions">
+        {access?.contentConfigured ? (
+          <a className="founder-access-button" href={access.contentUrl} rel="noreferrer" target="_blank">
+            <BookOpenCheck size={18} aria-hidden="true" />
+            Descargar guía y audios
+          </a>
+        ) : (
+          <span className="founder-access-button is-disabled">
+            <BookOpenCheck size={18} aria-hidden="true" />
+            Material digital pendiente
+          </span>
+        )}
+        <a className="founder-access-button founder-access-button--outline" href={telegramAccessUrl} rel="noreferrer" target="_blank">
+          <Send size={18} aria-hidden="true" />
+          Escribir al bot de Telegram
+        </a>
+      </div>
+    </section>
+  );
+}
+
 function SuccessPage() {
   const availability = useAvailability();
+  const [founderAccess, setFounderAccess] = useState(null);
+  const [founderAccessError, setFounderAccessError] = useState('');
   const [payment, setPayment] = useState(null);
   const [phase, setPhase] = useState('checking');
   const [paymentId] = useState(() => {
@@ -814,6 +881,15 @@ function SuccessPage() {
         if (nextPayment.status === 'paid') {
           setPhase('paid');
           availability.refresh();
+          try {
+            const access = await fetchFounderAccess(paymentId);
+            if (!active) return;
+            setFounderAccess(access);
+            setFounderAccessError('');
+          } catch {
+            if (!active) return;
+            setFounderAccessError('No pudimos cargar tus enlaces privados en este momento.');
+          }
           return;
         }
 
@@ -905,6 +981,10 @@ function SuccessPage() {
             Disponibles: <strong>{availability.counter.remainingCount}</strong> · Vendidos:{' '}
             <strong>{availability.counter.soldCount}</strong>
           </p>
+        )}
+
+        {phase === 'paid' && (
+          <FounderAccessPanel access={founderAccess} error={founderAccessError} />
         )}
 
         <div className="success-actions">

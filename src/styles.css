@@ -1313,6 +1313,114 @@ img {
   color: var(--gold-soft);
 }
 
+.founder-access {
+  margin-top: 26px;
+  border: 1px solid rgba(240, 198, 111, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 22px;
+  text-align: left;
+}
+
+.founder-access .eyebrow {
+  margin-bottom: 8px;
+}
+
+.founder-access h2 {
+  margin: 0 0 10px;
+  color: var(--white);
+  font-size: 1.18rem;
+  line-height: 1.2;
+}
+
+.founder-access > p:not(.eyebrow):not(.founder-access-status) {
+  margin: 0;
+  color: #d8cdbd;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.founder-access-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.founder-access-grid article {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  padding: 13px;
+}
+
+.founder-access-grid svg {
+  color: var(--gold-soft);
+}
+
+.founder-access-grid h3 {
+  margin: 0 0 5px;
+  color: var(--gold-soft);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.founder-access-grid p {
+  margin: 0;
+  color: #d8cdbd;
+  font-size: 0.75rem;
+  line-height: 1.42;
+}
+
+.founder-access-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.founder-access-status--error {
+  color: #ffb5a8;
+}
+
+.founder-access-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.founder-access-button {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 235, 178, 0.55);
+  border-radius: 7px;
+  background: linear-gradient(180deg, #f3c56a 0%, #c98632 100%);
+  color: #14100b;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.founder-access-button--outline {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--gold-soft);
+}
+
+.founder-access-button.is-disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.55);
+  opacity: 0.62;
+}
+
 .success-actions {
   display: flex;
   align-items: center;
@@ -1551,6 +1659,11 @@ img {
   }
 
   .payment-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .founder-access-grid,
+  .founder-access-actions {
     grid-template-columns: 1fr;
   }
 

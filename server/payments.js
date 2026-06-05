@@ -126,6 +126,17 @@ export async function getPaymentStatus(paymentId, database = getPool()) {
   return result.rows[0] ?? null;
 }
 
+export async function getFounderAccessPayment(paymentId, database = getPool()) {
+  const result = await database.query(
+    `SELECT id, email, name, status
+     FROM payments
+     WHERE id = $1`,
+    [paymentId],
+  );
+
+  return result.rows[0] ?? null;
+}
+
 function getStripeId(value) {
   if (typeof value === 'string') return value;
   if (value && typeof value.id === 'string') return value.id;

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildPaymentLinkUrl,
   completePaidPayment,
+  getFounderAccessPayment,
   normalizeEmail,
   normalizeName,
   ServiceError,
@@ -71,4 +72,23 @@ test('completePaidPayment increments availability only on the first paid transit
   assert.deepEqual(await completePaidPayment(session, database), { outcome: 'already_paid' });
   assert.equal(counterUpdates, 1);
   assert.equal(paymentUpdates, 1);
+});
+
+test('getFounderAccessPayment returns payment status for access checks', async () => {
+  const database = {
+    async query(_sql, params) {
+      assert.deepEqual(params, ['pay_test']);
+      return {
+        rowCount: 1,
+        rows: [{ id: 'pay_test', email: 'buyer@example.com', name: 'Buyer', status: 'paid' }],
+      };
+    },
+  };
+
+  assert.deepEqual(await getFounderAccessPayment('pay_test', database), {
+    id: 'pay_test',
+    email: 'buyer@example.com',
+    name: 'Buyer',
+    status: 'paid',
+  });
 });

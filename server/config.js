@@ -25,6 +25,7 @@ function isHttpsUrl(value) {
 export function getConfig() {
   return {
     databaseUrl: process.env.DATABASE_URL?.trim() ?? '',
+    founderContentUrl: process.env.FOUNDER_CONTENT_URL?.trim() ?? '',
     frontendUrl: normalizeUrl(process.env.FRONTEND_URL),
     host: '0.0.0.0',
     initialTotalQuantity: parseInteger(process.env.INITIAL_TOTAL_QUANTITY, 100, {
@@ -34,7 +35,12 @@ export function getConfig() {
     port: parseInteger(process.env.PORT, 3000, { min: 1, max: 65_535 }),
     stripePaymentLink: process.env.STRIPE_PAYMENT_LINK?.trim() ?? '',
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? '',
+    telegramBotUrl: process.env.TELEGRAM_BOT_URL?.trim() || 'https://t.me/Kiryusbot',
   };
+}
+
+export function getSafePublicUrl(value) {
+  return isHttpsUrl(value) ? value : '';
 }
 
 export function assertDatabaseConfig() {

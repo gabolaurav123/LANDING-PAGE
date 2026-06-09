@@ -40,7 +40,7 @@ const navItems = [
   { label: 'Beneficios', href: '#beneficios' },
   { label: 'Como funciona', href: '#tecnologia' },
   { label: 'Incluye', href: '#incluye' },
-  { label: 'Telegram', href: '#telegram' },
+  { label: 'Testimonios', href: '#testimonios' },
   { label: 'FAQ', href: '#faq' },
 ];
 
@@ -214,8 +214,8 @@ function Brand({ compact = false }) {
       <img src="/assets/kiryus-logo.png" alt="Logo KIRYUS" />
       {!compact && (
         <span>
-          <strong>KIRYUS</strong>
-          <small>BIOTECH WELLNESS</small>
+          <strong>BioShield</strong>
+          <small>by KIRYUS™</small>
         </span>
       )}
     </a>
@@ -321,39 +321,31 @@ function Hero({ onCheckout, soldOut }) {
             <CtaButton disabled={soldOut} onClick={() => onCheckout('hero_primary')} size="large">
               {soldOut ? 'Actualmente agotado' : 'Comprar BioShield'}
             </CtaButton>
-            <TelegramButton
-              className="telegram-button--hero"
-              eventName="click_more_info_telegram"
-              location="hero"
-            >
-              Más información en Telegram
-            </TelegramButton>
           </div>
           <p className="secure-note">
             <LockKeyhole size={14} />
             Compra 100% segura
           </p>
+          <div className="hero-benefits" aria-label="Beneficios principales">
+            {heroBenefits.map((item) => {
+              const Icon = item.icon;
+              return (
+                <article key={item.title} className="icon-row">
+                  <Icon aria-hidden="true" />
+                  <div>
+                    <h3>{item.title}</h3>
+                    <p>{item.copy}</p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
 
         <div className="hero-visual" aria-label={`Persona usando ${PRODUCT_NAME}`}>
           <img src="/assets/hero-wellness.png" alt={`Persona usando ${PRODUCT_NAME}`} />
           <div className="frequency-rings" aria-hidden="true" />
           <Brand compact />
-        </div>
-
-        <div className="hero-benefits" aria-label="Beneficios principales">
-          {heroBenefits.map((item) => {
-            const Icon = item.icon;
-            return (
-              <article key={item.title} className="icon-row">
-                <Icon aria-hidden="true" />
-                <div>
-                  <h3>{item.title}</h3>
-                  <p>{item.copy}</p>
-                </div>
-              </article>
-            );
-          })}
         </div>
       </div>
     </section>
@@ -395,27 +387,6 @@ function MindShift() {
             ))}
           </div>
         </div>
-      </div>
-    </section>
-  );
-}
-
-function TelegramDoubtBand() {
-  return (
-    <section className="telegram-strip">
-      <div className="container telegram-strip-inner">
-        <div>
-          <p className="eyebrow">Soporte antes de comprar</p>
-          <h2>¿Tienes dudas sobre {PRODUCT_NAME}?</h2>
-          <p>El bot oficial puede ayudarte con preguntas sobre compra, preventa y activación premium.</p>
-        </div>
-        <TelegramButton
-          className="telegram-button--strong"
-          eventName="click_more_info_telegram"
-          location="after_benefits"
-        >
-          Tengo dudas, hablar con el bot
-        </TelegramButton>
       </div>
     </section>
   );
@@ -504,23 +475,21 @@ function Technology({ counter, onCheckout, soldOut }) {
   );
 }
 
-function TelegramPremiumSection({ onCheckout, soldOut }) {
+function PremiumAccessSection({ onCheckout, soldOut }) {
   return (
-    <section className="telegram-premium-section" id="telegram">
+    <section className="telegram-premium-section" id="premium">
       <div className="container telegram-premium-grid">
         <div>
-          <p className="eyebrow">Soporte y acceso premium por Telegram</p>
+          <p className="eyebrow">Acceso premium incluido</p>
           <h2>Después de comprar, recibes un código premium de activación</h2>
           <p>
             Con ese código podrás desbloquear el acceso premium dentro del bot oficial de Telegram.
-            Si todavía no compraste, el bot también puede ayudarte a resolver dudas antes de tomar
-            una decisión.
+            La activación ocurre después del pago confirmado, desde la pantalla de éxito.
           </p>
           <div className="premium-actions">
             <CtaButton disabled={soldOut} onClick={() => onCheckout('telegram_premium')}>
               {soldOut ? 'Actualmente agotado' : 'Comprar y recibir código'}
             </CtaButton>
-            <TelegramButton location="telegram_section">Abrir bot de Telegram</TelegramButton>
           </div>
         </div>
         <div className="telegram-premium-list">
@@ -552,13 +521,6 @@ function ActivationSection({ onCheckout, soldOut }) {
           <CtaButton disabled={soldOut} onClick={() => onCheckout('activation_section')}>
             {soldOut ? 'Actualmente agotado' : 'Comprar BioShield'}
           </CtaButton>
-          <TelegramButton
-            className="telegram-button--outline"
-            eventName="click_more_info_telegram"
-            location="activation_section"
-          >
-            Abrir bot de Telegram
-          </TelegramButton>
         </div>
       </div>
     </section>
@@ -705,9 +667,6 @@ function FAQ() {
             );
           })}
         </div>
-        <div className="faq-telegram">
-          <TelegramButton location="faq">Resolver dudas en Telegram</TelegramButton>
-        </div>
       </div>
     </section>
   );
@@ -728,7 +687,7 @@ function FooterCta({ onCheckout, soldOut }) {
           </p>
           <p>
             <Zap size={17} />
-            Soporte en Telegram
+            Activación premium
           </p>
           <strong>{PRODUCT_NAME}. Vive tu experiencia con intención.</strong>
         </div>
@@ -916,9 +875,6 @@ function CheckoutModal({ availability, onClose, open }) {
             <LockKeyhole size={15} aria-hidden="true" />
             Pago procesado por Stripe
           </span>
-          <TelegramButton className="telegram-button--text" location="checkout">
-            Soporte por Telegram
-          </TelegramButton>
         </div>
       </section>
     </div>
@@ -1236,13 +1192,12 @@ export default function App() {
       <main>
         <Hero onCheckout={openCheckout} soldOut={soldOut} />
         <MindShift />
-        <TelegramDoubtBand />
         <Technology
           counter={availability.counter}
           onCheckout={openCheckout}
           soldOut={soldOut}
         />
-        <TelegramPremiumSection onCheckout={openCheckout} soldOut={soldOut} />
+        <PremiumAccessSection onCheckout={openCheckout} soldOut={soldOut} />
         <UrgencyBand availability={availability} />
         <ActivationSection onCheckout={openCheckout} soldOut={soldOut} />
         <Testimonials />

@@ -2,6 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { getPool } from './db.js';
 
 const COUNTER_KEY = 'main';
+const TRACKING_EVENTS = new Set([
+  'click_buy',
+  'click_telegram_support',
+  'click_more_info_telegram',
+  'purchase_success',
+  'premium_code_assigned',
+  'premium_code_error',
+  'telegram_activation_click',
+]);
 
 export class ServiceError extends Error {
   constructor(message, statusCode = 500, code = 'INTERNAL_ERROR') {
@@ -128,13 +137,184 @@ export async function getPaymentStatus(paymentId, database = getPool()) {
 
 export async function getFounderAccessPayment(paymentId, database = getPool()) {
   const result = await database.query(
-    `SELECT id, email, name, status
+    `SELECT
+       id,
+       email,
+       name,
+       status,
+       premium_code AS "premiumCode",
+       premium_code_assigned_at AS "premiumCodeAssignedAt",
+       premium_code_error AS "premiumCodeError"
      FROM payments
      WHERE id = $1`,
     [paymentId],
   );
 
   return result.rows[0] ?? null;
+}
+
+export async function recordTrackingEvent(
+  eventName,
+  { paymentId = null, email = null, metadata = null } = {},
+  database = getPool(),
+) {
+  if (!TRACKING_EVENTS.has(eventName)) {
+    throw new ServiceError('Evento no permitido.', 400, 'INVALID_EVENT');
+  }
+
+  await database.query(
+    `INSERT INTO tracking_events (event_name, payment_id, email, metadata)
+     VALUES ($1, $2, $3, $4::jsonb)`,
+    [
+      eventName,
+      typeof paymentId === 'string' ? paymentId : null,
+      typeof email === 'string' ? email.trim().toLowerCase() : null,
+      JSON.stringify(metadata ?? {}),
+    ],
+  );
+}
+
+export async function assignPremiumCodeForPayment(paymentId, database = getPool()) {
+  const client = await database.connect();
+
+  try {
+    await client.query('BEGIN');
+    const paymentResult = await client.query(
+      `SELECT
+         id,
+         email,
+         name,
+         status,
+         premium_code AS "premiumCode",
+         premium_code_assigned_at AS "premiumCodeAssignedAt"
+       FROM payments
+       WHERE id = $1
+       FOR UPDATE`,
+      [paymentId],
+    );
+
+    if (paymentResult.rowCount === 0) {
+      throw new ServiceError('Pago no encontrado', 404, 'PAYMENT_NOT_FOUND');
+    }
+
+    const payment = paymentResult.rows[0];
+
+    if (payment.status !== 'paid') {
+      throw new ServiceError(
+        'El pago todavia no esta confirmado.',
+        403,
+        'PAYMENT_NOT_PAID',
+      );
+    }
+
+    if (payment.premiumCode) {
+      await client.query('COMMIT');
+      return {
+        paymentId: payment.id,
+        email: payment.email,
+        name: payment.name,
+        premiumCode: payment.premiumCode,
+        premiumCodeAssignedAt: payment.premiumCodeAssignedAt,
+        codeStatus: 'reserved',
+        noCodesAvailable: false,
+      };
+    }
+
+    const codeResult = await client.query(
+      `SELECT id, code
+       FROM premium_codes
+       WHERE status = 'available'
+       ORDER BY id ASC
+       FOR UPDATE SKIP LOCKED
+       LIMIT 1`,
+    );
+
+    if (codeResult.rowCount === 0) {
+      await client.query(
+        `UPDATE payments
+         SET premium_code_error = 'NO_CODES_AVAILABLE'
+         WHERE id = $1`,
+        [payment.id],
+      );
+      await recordTrackingEvent(
+        'premium_code_error',
+        {
+          paymentId: payment.id,
+          email: payment.email,
+          metadata: { reason: 'NO_CODES_AVAILABLE' },
+        },
+        client,
+      );
+      await client.query('COMMIT');
+      return {
+        paymentId: payment.id,
+        email: payment.email,
+        name: payment.name,
+        premiumCode: null,
+        premiumCodeAssignedAt: null,
+        codeStatus: 'pending',
+        noCodesAvailable: true,
+      };
+    }
+
+    const premiumCode = codeResult.rows[0];
+
+    await client.query(
+      `UPDATE premium_codes
+       SET
+         status = 'reserved',
+         reserved_at = NOW(),
+         assigned_email = $2,
+         assigned_order_id = $3,
+         assigned_payment_id = $3,
+         assigned_source = 'landing',
+         delivered_at = NOW()
+       WHERE id = $1`,
+      [premiumCode.id, payment.email, payment.id],
+    );
+
+    const updatedPayment = await client.query(
+      `UPDATE payments
+       SET
+         premium_code_id = $2,
+         premium_code = $3,
+         premium_code_assigned_at = NOW(),
+         premium_code_error = NULL
+       WHERE id = $1
+       RETURNING premium_code_assigned_at AS "premiumCodeAssignedAt"`,
+      [payment.id, String(premiumCode.id), premiumCode.code],
+    );
+
+    await recordTrackingEvent(
+      'premium_code_assigned',
+      {
+        paymentId: payment.id,
+        email: payment.email,
+        metadata: { premiumCodeId: String(premiumCode.id) },
+      },
+      client,
+    );
+    await client.query('COMMIT');
+
+    return {
+      paymentId: payment.id,
+      email: payment.email,
+      name: payment.name,
+      premiumCode: premiumCode.code,
+      premiumCodeAssignedAt: updatedPayment.rows[0]?.premiumCodeAssignedAt ?? null,
+      codeStatus: 'reserved',
+      noCodesAvailable: false,
+    };
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      // The original database error is more useful than a rollback failure.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 function getStripeId(value) {
@@ -155,7 +335,7 @@ export async function completePaidPayment(session, database = getPool()) {
   try {
     await client.query('BEGIN');
     const paymentResult = await client.query(
-      `SELECT id, status, counter_key
+      `SELECT id, email, name, status, counter_key
        FROM payments
        WHERE id = $1
        FOR UPDATE`,
@@ -182,6 +362,11 @@ export async function completePaidPayment(session, database = getPool()) {
       [payment.counter_key],
     );
 
+    const customerEmail =
+      typeof session.customer_details?.email === 'string'
+        ? session.customer_details.email.trim().toLowerCase()
+        : null;
+
     await client.query(
       `UPDATE payments
        SET
@@ -199,11 +384,87 @@ export async function completePaidPayment(session, database = getPool()) {
         getStripeId(session.payment_intent),
         Number.isInteger(session.amount_total) ? session.amount_total : null,
         typeof session.currency === 'string' ? session.currency : null,
-        typeof session.customer_details?.email === 'string'
-          ? session.customer_details.email.trim().toLowerCase()
-          : null,
+        customerEmail,
       ],
     );
+
+    await recordTrackingEvent(
+      'purchase_success',
+      {
+        paymentId,
+        email: customerEmail,
+        metadata: {
+          stripeSessionId: getStripeId(session.id),
+          amountTotal: Number.isInteger(session.amount_total) ? session.amount_total : null,
+          currency: typeof session.currency === 'string' ? session.currency : null,
+        },
+      },
+      client,
+    );
+
+    const premiumCodeResult = await client.query(
+      `SELECT id, code
+       FROM premium_codes
+       WHERE status = 'available'
+       ORDER BY id ASC
+       FOR UPDATE SKIP LOCKED
+       LIMIT 1`,
+    );
+
+    if (premiumCodeResult.rowCount === 1) {
+      const premiumCode = premiumCodeResult.rows[0];
+
+      await client.query(
+        `UPDATE premium_codes
+         SET
+           status = 'reserved',
+           reserved_at = NOW(),
+           assigned_email = $2,
+           assigned_order_id = $3,
+           assigned_payment_id = $3,
+           assigned_source = 'landing',
+           delivered_at = NOW()
+         WHERE id = $1`,
+        [premiumCode.id, customerEmail ?? payment.email, paymentId],
+      );
+
+      await client.query(
+        `UPDATE payments
+         SET
+           premium_code_id = $2,
+           premium_code = $3,
+           premium_code_assigned_at = NOW(),
+           premium_code_error = NULL
+         WHERE id = $1`,
+        [paymentId, String(premiumCode.id), premiumCode.code],
+      );
+
+      await recordTrackingEvent(
+        'premium_code_assigned',
+        {
+          paymentId,
+          email: customerEmail ?? payment.email,
+          metadata: { premiumCodeId: String(premiumCode.id), source: 'webhook' },
+        },
+        client,
+      );
+    } else {
+      await client.query(
+        `UPDATE payments
+         SET premium_code_error = 'NO_CODES_AVAILABLE'
+         WHERE id = $1`,
+        [paymentId],
+      );
+      await recordTrackingEvent(
+        'premium_code_error',
+        {
+          paymentId,
+          email: customerEmail ?? payment.email,
+          metadata: { reason: 'NO_CODES_AVAILABLE', source: 'webhook' },
+        },
+        client,
+      );
+    }
 
     await client.query('COMMIT');
     return {

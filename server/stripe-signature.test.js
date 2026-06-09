@@ -5,7 +5,7 @@ import { verifyStripeSignature } from './stripe-signature.js';
 
 test('verifies a valid Stripe webhook signature', () => {
   const payload = JSON.stringify({ id: 'evt_test' });
-  const secret = 'whsec_test_only';
+  const secret = 'test_webhook_secret';
   const timestamp = 1_700_000_000;
   const signature = createHmac('sha256', secret)
     .update(`${timestamp}.${payload}`, 'utf8')
@@ -29,7 +29,7 @@ test('rejects invalid or expired Stripe webhook signatures', () => {
     verifyStripeSignature({
       payload: Buffer.from(payload),
       signatureHeader: 't=1700000000,v1=invalid',
-      secret: 'whsec_test_only',
+      secret: 'test_webhook_secret',
       now: 1_700_000_000,
     }),
     false,
@@ -39,7 +39,7 @@ test('rejects invalid or expired Stripe webhook signatures', () => {
     verifyStripeSignature({
       payload: Buffer.from(payload),
       signatureHeader: 't=1700000000,v1=invalid',
-      secret: 'whsec_test_only',
+      secret: 'test_webhook_secret',
       now: 1_700_001_000,
     }),
     false,

@@ -8,16 +8,18 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  Copy,
   CreditCard,
   Flower2,
   HeartPulse,
+  KeyRound,
   LoaderCircle,
   LockKeyhole,
   Mail,
   Menu,
+  MessageCircle,
   Music,
   PackageCheck,
-  Radio,
   Send,
   ShieldCheck,
   Smartphone,
@@ -28,115 +30,116 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { createPayment, fetchFounderAccess, fetchPaymentStatus } from './api.js';
+import { assignPremiumCode, createPayment, fetchPaymentStatus, trackEvent } from './api.js';
 import { useAvailability } from './useAvailability.js';
 
-const telegramUrl = 'https://t.me/Kiryusbot';
+const PRODUCT_NAME = 'BioShield by KIRYUS™';
+const telegramUrl = import.meta.env.VITE_TELEGRAM_BOT_URL || 'https://t.me/Kiryusbot';
 
 const navItems = [
   { label: 'Beneficios', href: '#beneficios' },
   { label: 'Como funciona', href: '#tecnologia' },
   { label: 'Incluye', href: '#incluye' },
-  { label: 'Testimonios', href: '#testimonios' },
+  { label: 'Telegram', href: '#telegram' },
   { label: 'FAQ', href: '#faq' },
 ];
 
 const heroBenefits = [
   {
     icon: Brain,
-    title: 'Protege tu mente',
-    copy: 'Reduce la exposicion a campos electromagneticos ambientales.',
+    title: 'Pensado para enfoque',
+    copy: 'Acompaña tus momentos de pausa, trabajo profundo y presencia diaria.',
   },
   {
     icon: HeartPulse,
-    title: 'Cuida tu corazon',
-    copy: 'Favorece la coherencia cardiaca y el equilibrio del sistema nervioso.',
+    title: 'Rituales de calma',
+    copy: 'Diseñado para integrarse en hábitos de respiración, descanso y regulación.',
   },
   {
     icon: Flower2,
-    title: 'Mejora tu bienestar',
-    copy: 'Disminuye el estres, la fatiga mental y la sobrecarga sensorial.',
+    title: 'Experiencia premium',
+    copy: 'Textiles seleccionados, diseño cómodo y acceso digital posterior a la compra.',
   },
   {
-    icon: Radio,
-    title: 'Eleva tu frecuencia',
-    copy: 'Disenado para acompanarte en meditacion, trabajo profundo y descanso.',
+    icon: MessageCircle,
+    title: 'Acceso por Telegram',
+    copy: 'Recibe un código premium para activar contenido dentro del bot oficial.',
   },
 ];
 
 const overloadItems = [
   {
     icon: Smartphone,
-    title: 'Sobreexposicion digital',
-    copy: 'Pantallas, Wi-Fi, 5G, Bluetooth y notificaciones sin pausa.',
+    title: 'Ruido digital',
+    copy: 'Pantallas, mensajes, tareas abiertas y notificaciones constantes.',
   },
   {
     icon: Brain,
     title: 'Mente saturada',
-    copy: 'Ansiedad, ruido mental, poca claridad y agotamiento.',
+    copy: 'Días con poca claridad, cansancio mental y atención fragmentada.',
   },
   {
     icon: BatteryLow,
-    title: 'Energia drenada',
-    copy: 'Cuesta concentrarte, descansar y conectar contigo.',
+    title: 'Hábitos dispersos',
+    copy: 'Cuesta pausar, respirar, volver al cuerpo y sostener una rutina.',
   },
 ];
 
 const newStateItems = [
   {
     icon: Sparkles,
-    title: 'Mas enfoque',
-    copy: 'Claridad mental para tomar mejores decisiones.',
+    title: 'Más enfoque',
+    copy: 'Un recordatorio físico para volver a lo importante durante el día.',
   },
   {
     icon: Flower2,
     title: 'Calma interior',
-    copy: 'Regula tu sistema nervioso y reduce la sobrecarga.',
+    copy: 'Pensado para acompañar momentos de pausa y regulación personal.',
   },
   {
     icon: Brain,
     title: 'Bienestar neuroambiental',
-    copy: 'Proteccion y equilibrio en tu entorno digital.',
+    copy: 'Una experiencia premium para crear hábitos con más intención.',
   },
   {
     icon: HeartPulse,
-    title: 'Coherencia mente-corazon',
-    copy: 'Armonia, energia y presencia durante el dia.',
+    title: 'Coherencia y presencia',
+    copy: 'Contenido guiado para meditación, descanso y claridad mental.',
   },
 ];
 
 const techFeatures = [
-  ['Algodon organico', 'Suavidad y confort para tu piel.'],
-  ['Tela conductiva de plata y cobre', 'Apantallamiento electromagnetico.'],
-  ['Carbono activado', 'Disipacion y equilibrio energetico.'],
-  ['Bolsillo interno para shungita', 'Armonia y proteccion natural.'],
+  ['Algodón orgánico', 'Suavidad y confort para uso cotidiano.'],
+  ['Textil técnico premium', 'Capas seleccionadas para una experiencia sobria y cómoda.'],
+  ['Estructura por capas', 'Diseño interno cuidado para mantener forma y ergonomía.'],
+  ['Bolsillo interno', 'Espacio discreto para integrar tu ritual personal.'],
 ];
 
 const kitItems = [
   {
     icon: Brain,
-    title: 'Kiryus BioShield',
-    copy: 'Edicion Founder limitada y numerada.',
+    title: PRODUCT_NAME,
+    copy: 'Edición Founder limitada y numerada.',
   },
   {
     icon: Music,
-    title: 'Audio Neurofocus Premium',
-    copy: 'Meditaciones y frecuencias exclusivas.',
+    title: 'Audios Neurofocus',
+    copy: 'Contenido premium para enfoque, calma y descanso.',
   },
   {
     icon: BookOpenCheck,
-    title: 'Metodo Coherencia Kiryus',
-    copy: 'Guia digital para alinear mente y corazon.',
+    title: 'Guía digital',
+    copy: 'Método de coherencia para alinear mente, pausa y presencia.',
   },
   {
-    icon: UsersRound,
-    title: 'Acceso comunidad VIP',
-    copy: 'Grupo exclusivo de fundadores.',
+    icon: KeyRound,
+    title: 'Código premium',
+    copy: 'Código único para activar el acceso dentro del bot oficial de Telegram.',
   },
   {
     icon: Award,
-    title: 'Certificado Founder Edition',
-    copy: 'Tu numero de fundador y certificado digital.',
+    title: 'Certificado Founder',
+    copy: 'Tu número de fundador y certificado digital.',
   },
 ];
 
@@ -145,25 +148,34 @@ const testimonials = [
     name: 'Maria E.',
     role: 'Neurocoach',
     initials: 'ME',
-    copy: 'Desde que uso Kiryus BioShield siento mi mente mas clara y mi energia mas estable. Lo uso para meditar, trabajar y hasta para dormir.',
+    copy: `${PRODUCT_NAME} se volvió parte de mis pausas de trabajo y meditación. Me ayuda a sostener una rutina más consciente.`,
   },
   {
     name: 'Andres R.',
     role: 'Emprendedor',
     initials: 'AR',
-    copy: 'Me ayuda a desconectarme del ruido digital. Duermo mejor y estoy mas enfocado durante el dia.',
+    copy: 'Lo uso como recordatorio físico para desconectarme del ruido digital y volver a enfocarme durante el día.',
   },
   {
     name: 'Sofia L.',
-    role: 'Terapeuta holistica',
+    role: 'Terapeuta holística',
     initials: 'SL',
-    copy: 'Es parte de mi ritual diario. Siento un cambio real en mi coherencia y en mi bienestar general.',
+    copy: 'El acceso premium por Telegram hace que la experiencia sea más completa y fácil de seguir.',
   },
+];
+
+const premiumTelegramItems = [
+  ['Activa tu código premium', KeyRound],
+  ['Accede a guías de enfoque', Brain],
+  ['Explora rutinas de regulación', Flower2],
+  ['Recibe contenido de descanso', Music],
+  ['Trabaja fatiga digital', Smartphone],
+  ['Practica coherencia y meditación', HeartPulse],
 ];
 
 const faqs = [
   {
-    question: '¿Cuándo recibiré mi Kiryus BioShield?',
+    question: `¿Cuándo recibiré mi ${PRODUCT_NAME}?`,
     answer: 'Las entregas comienzan 25 a 40 días después del cierre de preventa.',
   },
   {
@@ -178,12 +190,28 @@ const faqs = [
     question: '¿Tiene garantía?',
     answer: 'Sí, garantía de 30 días por defectos de fabricación.',
   },
+  {
+    question: '¿Cómo recibo mi código premium?',
+    answer: `Después de completar la compra de ${PRODUCT_NAME}, la pantalla de éxito te mostrará un código único de activación.`,
+  },
+  {
+    question: '¿Dónde activo mi código?',
+    answer: 'Debes abrir el bot oficial de Telegram, tocar Activar código premium y pegar tu código.',
+  },
+  {
+    question: '¿Qué pasa si mi código no funciona?',
+    answer: 'Verifica que lo escribiste correctamente. Si el problema continúa, toca Soporte en Telegram para recibir ayuda.',
+  },
+  {
+    question: '¿Puedo usar el código más de una vez?',
+    answer: 'No. Cada código premium es único y solo puede activarse una vez.',
+  },
 ];
 
 function Brand({ compact = false }) {
   return (
-    <a className="brand" href="#inicio" aria-label="Kiryus BioShield inicio">
-      <img src="/assets/kiryus-logo.png" alt="Logo Kiryus" />
+    <a className="brand" href="#inicio" aria-label={`${PRODUCT_NAME} inicio`}>
+      <img src="/assets/kiryus-logo.png" alt="Logo KIRYUS" />
       {!compact && (
         <span>
           <strong>KIRYUS</strong>
@@ -214,6 +242,21 @@ function CtaButton({
   );
 }
 
+function TelegramButton({ children, className = '', eventName = 'click_telegram_support', location }) {
+  return (
+    <a
+      className={`telegram-button ${className}`}
+      href={telegramUrl}
+      rel="noreferrer"
+      target="_blank"
+      onClick={() => trackEvent(eventName, { location })}
+    >
+      <Send size={18} aria-hidden="true" />
+      <span>{children}</span>
+    </a>
+  );
+}
+
 function Header({ onCheckout, soldOut }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -223,7 +266,7 @@ function Header({ onCheckout, soldOut }) {
     <header className="site-header">
       <div className="container header-inner">
         <Brand />
-        <nav className={`main-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Navegacion principal">
+        <nav className={`main-nav ${menuOpen ? 'is-open' : ''}`} aria-label="Navegación principal">
           {navItems.map((item) => (
             <a key={item.href} href={item.href} onClick={closeMenu}>
               {item.label}
@@ -231,19 +274,22 @@ function Header({ onCheckout, soldOut }) {
           ))}
         </nav>
         <div className="header-actions">
+          <TelegramButton className="telegram-button--header" location="header">
+            Soporte en Telegram
+          </TelegramButton>
           <button
             className="reserve-link"
             type="button"
             disabled={soldOut}
-            onClick={onCheckout}
+            onClick={() => onCheckout('header')}
           >
-            {soldOut ? 'Agotado' : 'Reservar mi unidad'}
-            <small>Edicion limitada</small>
+            {soldOut ? 'Agotado' : 'Comprar BioShield'}
+            <small>Edición limitada</small>
           </button>
           <button
             className="menu-toggle"
             type="button"
-            aria-label={menuOpen ? 'Cerrar menu' : 'Abrir menu'}
+            aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((open) => !open)}
           >
@@ -260,27 +306,37 @@ function Hero({ onCheckout, soldOut }) {
     <section className="hero-section" id="inicio">
       <div className="container hero-grid">
         <div className="hero-copy">
-          <p className="eyebrow">Nueva generacion de bienestar neuroambiental</p>
+          <p className="eyebrow">Nueva generación de bienestar neuroambiental</p>
           <h1>
-            <span>Kiryus</span>
-            <strong>BioShield</strong>
+            <span>BioShield</span>
+            <strong>by KIRYUS™</strong>
           </h1>
-          <p className="hero-lead">Protege tu energia. Enfoca tu mente. Eleva tu frecuencia.</p>
+          <p className="hero-lead">Una experiencia premium para enfoque, pausa y presencia.</p>
           <p className="hero-body">
-            Disenado para ayudarte a reducir la sobreestimulacion digital, mejorar tu enfoque y crear
-            un estado de coherencia mente-cuerpo.
+            {PRODUCT_NAME} combina diseño textil premium con acceso digital guiado. Después de
+            comprar, recibirás un código único para activar contenido premium dentro del bot oficial
+            de Telegram.
           </p>
-          <CtaButton disabled={soldOut} onClick={onCheckout} size="large">
-            {soldOut ? 'Actualmente agotado' : 'Reservar mi unidad'}
-          </CtaButton>
+          <div className="hero-actions">
+            <CtaButton disabled={soldOut} onClick={() => onCheckout('hero_primary')} size="large">
+              {soldOut ? 'Actualmente agotado' : 'Comprar BioShield'}
+            </CtaButton>
+            <TelegramButton
+              className="telegram-button--hero"
+              eventName="click_more_info_telegram"
+              location="hero"
+            >
+              Más información en Telegram
+            </TelegramButton>
+          </div>
           <p className="secure-note">
             <LockKeyhole size={14} />
             Compra 100% segura
           </p>
         </div>
 
-        <div className="hero-visual" aria-label="Mujer usando Kiryus BioShield">
-          <img src="/assets/hero-wellness.png" alt="Persona usando Kiryus BioShield" />
+        <div className="hero-visual" aria-label={`Persona usando ${PRODUCT_NAME}`}>
+          <img src="/assets/hero-wellness.png" alt={`Persona usando ${PRODUCT_NAME}`} />
           <div className="frequency-rings" aria-hidden="true" />
           <Brand compact />
         </div>
@@ -321,7 +377,7 @@ function MindShift() {
     <section className="mind-section" id="beneficios">
       <div className="container mind-grid">
         <div className="mind-group">
-          <h2>Tu mente realmente descansa?</h2>
+          <h2>¿Tu mente realmente descansa?</h2>
           <div className="state-list state-list--three">
             {overloadItems.map((item) => (
               <StateCard key={item.title} item={item} />
@@ -344,29 +400,49 @@ function MindShift() {
   );
 }
 
+function TelegramDoubtBand() {
+  return (
+    <section className="telegram-strip">
+      <div className="container telegram-strip-inner">
+        <div>
+          <p className="eyebrow">Soporte antes de comprar</p>
+          <h2>¿Tienes dudas sobre {PRODUCT_NAME}?</h2>
+          <p>El bot oficial puede ayudarte con preguntas sobre compra, preventa y activación premium.</p>
+        </div>
+        <TelegramButton
+          className="telegram-button--strong"
+          eventName="click_more_info_telegram"
+          location="after_benefits"
+        >
+          Tengo dudas, hablar con el bot
+        </TelegramButton>
+      </div>
+    </section>
+  );
+}
+
 function Technology({ counter, onCheckout, soldOut }) {
   return (
     <section className="technology-section" id="tecnologia">
       <div className="container technology-grid">
         <div className="product-showcase">
-          <img src="/assets/bioshield-layers.png" alt="Capas internas de Kiryus BioShield" />
+          <img src="/assets/bioshield-layers.png" alt={`Capas internas de ${PRODUCT_NAME}`} />
           <div className="badge">
             <strong>
-              <span>Tecnología</span>
+              <span>Bienestar</span>
               <span>Neuroambiental</span>
-              <span>Avanzada</span>
+              <span>Premium</span>
             </strong>
             <span className="badge-stars">*****</span>
           </div>
         </div>
 
         <div className="tech-copy">
-          <p className="eyebrow">Tecnologia que</p>
-          <h2>Protege tu mundo</h2>
+          <p className="eyebrow">Tecnología que</p>
+          <h2>Acompaña tu mundo</h2>
           <p>
-            Kiryus BioShield combina materiales avanzados de apantallamiento electromagnetico con
-            diseno ergonomico y coherencia neuroenergetica para ayudarte a vivir con mas claridad,
-            calma y coherencia.
+            {PRODUCT_NAME} combina materiales seleccionados, diseño ergonómico y una experiencia
+            digital guiada para acompañar hábitos de enfoque, calma y presencia.
           </p>
           <ul className="feature-list">
             {techFeatures.map(([title, copy]) => (
@@ -401,7 +477,7 @@ function Technology({ counter, onCheckout, soldOut }) {
 
         <aside className="price-panel" aria-label="Precio fundador">
           <div className="price-top">
-            <span>Edicion</span>
+            <span>Edición</span>
             <strong>Founder</strong>
             <p>
               {counter
@@ -409,20 +485,81 @@ function Technology({ counter, onCheckout, soldOut }) {
                 : 'Oferta limitada'}
             </p>
           </div>
-          <img src="/assets/founder-kit.png" alt="Kit fundador Kiryus BioShield" />
+          <img src="/assets/founder-kit.png" alt={`Kit fundador de ${PRODUCT_NAME}`} />
           <div className="price-copy">
             <span className="future-price">Precio futuro <s>$147</s></span>
             <span>Precio Fundador</span>
             <strong>$97</strong>
           </div>
-          <CtaButton className="price-cta" disabled={soldOut} onClick={onCheckout}>
+          <CtaButton className="price-cta" disabled={soldOut} onClick={() => onCheckout('price_panel')}>
             {soldOut ? 'Sin unidades disponibles' : 'Primeras 30 unidades 79 dólares'}
           </CtaButton>
           <p className="shipping">
             <PackageCheck size={15} />
-            Envio gratis a todo el pais
+            Envío gratis a todo el país
           </p>
         </aside>
+      </div>
+    </section>
+  );
+}
+
+function TelegramPremiumSection({ onCheckout, soldOut }) {
+  return (
+    <section className="telegram-premium-section" id="telegram">
+      <div className="container telegram-premium-grid">
+        <div>
+          <p className="eyebrow">Soporte y acceso premium por Telegram</p>
+          <h2>Después de comprar, recibes un código premium de activación</h2>
+          <p>
+            Con ese código podrás desbloquear el acceso premium dentro del bot oficial de Telegram.
+            Si todavía no compraste, el bot también puede ayudarte a resolver dudas antes de tomar
+            una decisión.
+          </p>
+          <div className="premium-actions">
+            <CtaButton disabled={soldOut} onClick={() => onCheckout('telegram_premium')}>
+              {soldOut ? 'Actualmente agotado' : 'Comprar y recibir código'}
+            </CtaButton>
+            <TelegramButton location="telegram_section">Abrir bot de Telegram</TelegramButton>
+          </div>
+        </div>
+        <div className="telegram-premium-list">
+          {premiumTelegramItems.map(([label, Icon]) => (
+            <article key={label}>
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ActivationSection({ onCheckout, soldOut }) {
+  return (
+    <section className="activation-section">
+      <div className="container activation-inner">
+        <div>
+          <p className="eyebrow">Activa tu experiencia premium</p>
+          <h2>{PRODUCT_NAME} incluye acceso premium al bot oficial de Telegram</h2>
+          <p>
+            Después de comprar recibirás un código único de activación para desbloquear contenido de
+            enfoque, regulación, descanso, fatiga digital, coherencia y meditación.
+          </p>
+        </div>
+        <div className="activation-actions">
+          <CtaButton disabled={soldOut} onClick={() => onCheckout('activation_section')}>
+            {soldOut ? 'Actualmente agotado' : 'Comprar BioShield'}
+          </CtaButton>
+          <TelegramButton
+            className="telegram-button--outline"
+            eventName="click_more_info_telegram"
+            location="activation_section"
+          >
+            Abrir bot de Telegram
+          </TelegramButton>
+        </div>
       </div>
     </section>
   );
@@ -483,9 +620,9 @@ function UrgencyBand({ availability }) {
         <div className="urgency-item">
           <UsersRound aria-hidden="true" />
           <p>
-            Unete a los primeros
+            Únete a los primeros
             <strong>
-              {counter ? `${counter.totalQuantity} fundadores` : 'Edicion limitada'}
+              {counter ? `${counter.totalQuantity} fundadores` : 'Edición limitada'}
             </strong>
           </p>
         </div>
@@ -494,7 +631,7 @@ function UrgencyBand({ availability }) {
           <Clock3 aria-hidden="true" />
           <p>
             Cierre de preventa en
-            <strong>07 dias / 14 horas / 23 min</strong>
+            <strong>07 días / 14 horas / 23 min</strong>
           </p>
         </div>
       </div>
@@ -568,6 +705,9 @@ function FAQ() {
             );
           })}
         </div>
+        <div className="faq-telegram">
+          <TelegramButton location="faq">Resolver dudas en Telegram</TelegramButton>
+        </div>
       </div>
     </section>
   );
@@ -580,21 +720,21 @@ function FooterCta({ onCheckout, soldOut }) {
         <div className="footer-benefits">
           <p>
             <ShieldCheck size={17} />
-            Protege tu energia
+            Ritual de enfoque
           </p>
           <p>
             <Brain size={17} />
-            Enfoca tu mente
+            Acceso premium
           </p>
           <p>
             <Zap size={17} />
-            Eleva tu frecuencia
+            Soporte en Telegram
           </p>
-          <strong>Esta es tu era. Vive en coherencia.</strong>
+          <strong>{PRODUCT_NAME}. Vive tu experiencia con intención.</strong>
         </div>
         <div className="footer-action">
-          <CtaButton disabled={soldOut} onClick={onCheckout} size="large">
-            {soldOut ? 'Actualmente agotado' : 'Reservar y pagar'}
+          <CtaButton disabled={soldOut} onClick={() => onCheckout('footer')} size="large">
+            {soldOut ? 'Actualmente agotado' : 'Comprar BioShield'}
           </CtaButton>
           <p>
             <LockKeyhole size={14} />
@@ -700,12 +840,13 @@ function CheckoutModal({ availability, onClose, open }) {
           <img src="/assets/kiryus-logo.png" alt="" />
           <div>
             <span>Edición Founder</span>
-            <h2 id="checkout-title">Reserva tu Kiryus BioShield</h2>
+            <h2 id="checkout-title">Comprar {PRODUCT_NAME}</h2>
           </div>
         </div>
 
         <p className="checkout-intro">
-          Completa tus datos. Crearemos tu reserva y te enviaremos al pago seguro de Stripe.
+          Completa tus datos. Crearemos tu reserva, te enviaremos al pago seguro de Stripe y, al
+          confirmarse el pago, recibirás tu código premium para Telegram.
         </p>
 
         {availability.counter && (
@@ -775,50 +916,43 @@ function CheckoutModal({ availability, onClose, open }) {
             <LockKeyhole size={15} aria-hidden="true" />
             Pago procesado por Stripe
           </span>
-          <a href={telegramUrl} rel="noreferrer" target="_blank">
-            <Send size={15} aria-hidden="true" />
+          <TelegramButton className="telegram-button--text" location="checkout">
             Soporte por Telegram
-          </a>
+          </TelegramButton>
         </div>
       </section>
     </div>
   );
 }
 
-function FounderAccessPanel({ access, error }) {
+function PremiumAccessPanel({ access, error }) {
+  const [copied, setCopied] = useState(false);
   const accessPending = !access && !error;
-  const telegramAccessUrl = access?.telegramUrl || telegramUrl;
+  const accessTelegramUrl = access?.telegramUrl || telegramUrl;
+  const hasCode = Boolean(access?.premiumCode);
+  const waitingForCode = access?.noCodesAvailable || access?.codeStatus === 'pending';
+
+  const copyCode = async () => {
+    if (!access?.premiumCode) return;
+
+    try {
+      await navigator.clipboard.writeText(access.premiumCode);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   return (
-    <section className="founder-access" aria-labelledby="founder-access-title">
-      <p className="eyebrow">Contenido Founder</p>
-      <h2 id="founder-access-title">Tu kit digital está listo</h2>
-      <p>
-        Accede a la guía digital para alinear mente y corazón, los audios Neurofocus y el bot de
-        Telegram para continuar tu proceso.
-      </p>
-
-      <div className="founder-access-grid">
-        <article>
-          <BookOpenCheck aria-hidden="true" />
-          <div>
-            <h3>Guía digital</h3>
-            <p>Método Coherencia Kiryus para alinear mente y corazón.</p>
-          </div>
-        </article>
-        <article>
-          <Music aria-hidden="true" />
-          <div>
-            <h3>Audios Neurofocus</h3>
-            <p>Meditaciones y frecuencias para enfoque, calma y descanso.</p>
-          </div>
-        </article>
-      </div>
+    <section className="founder-access" aria-labelledby="premium-access-title">
+      <p className="eyebrow">Acceso premium</p>
+      <h2 id="premium-access-title">Tu acceso premium ya está listo</h2>
 
       {accessPending && (
         <p className="founder-access-status">
           <LoaderCircle className="is-spinning" size={17} aria-hidden="true" />
-          Preparando tus enlaces privados...
+          Generando tu código premium...
         </p>
       )}
 
@@ -829,22 +963,79 @@ function FounderAccessPanel({ access, error }) {
         </p>
       )}
 
+      {hasCode && (
+        <>
+          <p>
+            Gracias por adquirir {PRODUCT_NAME}. Guarda este código y úsalo dentro del bot oficial
+            de Telegram para activar tu acceso premium.
+          </p>
+          <div className="premium-code-box">
+            <span>Tu código de activación</span>
+            <strong>{access.premiumCode}</strong>
+          </div>
+          <ol className="activation-steps">
+            <li>Abre el bot oficial de Telegram.</li>
+            <li>Toca Activar código premium.</li>
+            <li>Pega tu código.</li>
+            <li>Accede al contenido premium de {PRODUCT_NAME}.</li>
+          </ol>
+        </>
+      )}
+
+      {waitingForCode && (
+        <p>
+          Tu compra fue recibida correctamente, pero estamos generando tu código premium. Por favor
+          contacta al soporte oficial de Telegram para recibir ayuda.
+        </p>
+      )}
+
+      {access?.contentConfigured && (
+        <div className="founder-access-grid">
+          <article>
+            <BookOpenCheck aria-hidden="true" />
+            <div>
+              <h3>Guía digital</h3>
+              <p>Material privado para enfoque, pausa y coherencia.</p>
+            </div>
+          </article>
+          <article>
+            <Music aria-hidden="true" />
+            <div>
+              <h3>Audios Neurofocus</h3>
+              <p>Contenido de acompañamiento para descanso y concentración.</p>
+            </div>
+          </article>
+        </div>
+      )}
+
       <div className="founder-access-actions">
-        {access?.contentConfigured ? (
-          <a className="founder-access-button" href={access.contentUrl} rel="noreferrer" target="_blank">
+        {hasCode && (
+          <button className="founder-access-button" type="button" onClick={copyCode}>
+            <Copy size={18} aria-hidden="true" />
+            {copied ? 'Código copiado' : 'Copiar código'}
+          </button>
+        )}
+        <a
+          className="founder-access-button founder-access-button--outline"
+          href={accessTelegramUrl}
+          rel="noreferrer"
+          target="_blank"
+          onClick={() => trackEvent('telegram_activation_click', { location: 'success', hasCode })}
+        >
+          <Send size={18} aria-hidden="true" />
+          {hasCode ? 'Activar en Telegram' : 'Contactar soporte en Telegram'}
+        </a>
+        {access?.contentConfigured && (
+          <a
+            className="founder-access-button"
+            href={access.contentUrl}
+            rel="noreferrer"
+            target="_blank"
+          >
             <BookOpenCheck size={18} aria-hidden="true" />
             Descargar guía y audios
           </a>
-        ) : (
-          <span className="founder-access-button is-disabled">
-            <BookOpenCheck size={18} aria-hidden="true" />
-            Material digital pendiente
-          </span>
         )}
-        <a className="founder-access-button founder-access-button--outline" href={telegramAccessUrl} rel="noreferrer" target="_blank">
-          <Send size={18} aria-hidden="true" />
-          Escribir al bot de Telegram
-        </a>
       </div>
     </section>
   );
@@ -852,8 +1043,8 @@ function FounderAccessPanel({ access, error }) {
 
 function SuccessPage() {
   const availability = useAvailability();
-  const [founderAccess, setFounderAccess] = useState(null);
-  const [founderAccessError, setFounderAccessError] = useState('');
+  const [premiumAccess, setPremiumAccess] = useState(null);
+  const [premiumAccessError, setPremiumAccessError] = useState('');
   const [payment, setPayment] = useState(null);
   const [phase, setPhase] = useState('checking');
   const [paymentId] = useState(() => {
@@ -882,13 +1073,15 @@ function SuccessPage() {
           setPhase('paid');
           availability.refresh();
           try {
-            const access = await fetchFounderAccess(paymentId);
+            const access = await assignPremiumCode(paymentId);
             if (!active) return;
-            setFounderAccess(access);
-            setFounderAccessError('');
+            setPremiumAccess(access);
+            setPremiumAccessError('');
           } catch {
             if (!active) return;
-            setFounderAccessError('No pudimos cargar tus enlaces privados en este momento.');
+            setPremiumAccessError(
+              'No pudimos generar tu código premium en este momento. Contacta soporte en Telegram.',
+            );
           }
           return;
         }
@@ -930,8 +1123,8 @@ function SuccessPage() {
     },
     paid: {
       icon: <CheckCircle2 aria-hidden="true" />,
-      title: 'Pago confirmado correctamente',
-      copy: 'Tu unidad Founder quedó registrada. Te contactaremos con los siguientes pasos.',
+      title: 'Compra confirmada',
+      copy: `Gracias por adquirir ${PRODUCT_NAME}. Tu compra fue confirmada por Stripe.`,
     },
     missing: {
       icon: <AlertCircle aria-hidden="true" />,
@@ -955,7 +1148,7 @@ function SuccessPage() {
       <section className={`success-panel success-panel--${phase}`}>
         <Brand />
         <div className="success-status-icon">{statusContent.icon}</div>
-        <p className="eyebrow">Estado de tu reserva</p>
+        <p className="eyebrow">Estado de tu compra</p>
         <h1>{statusContent.title}</h1>
         <p>{statusContent.copy}</p>
 
@@ -984,20 +1177,41 @@ function SuccessPage() {
         )}
 
         {phase === 'paid' && (
-          <FounderAccessPanel access={founderAccess} error={founderAccessError} />
+          <PremiumAccessPanel access={premiumAccess} error={premiumAccessError} />
         )}
 
         <div className="success-actions">
           <a className="cta-button" href="/">
             Volver a la landing
           </a>
-          <a className="support-link" href={telegramUrl} rel="noreferrer" target="_blank">
+          <a
+            className="support-link"
+            href={telegramUrl}
+            rel="noreferrer"
+            target="_blank"
+            onClick={() => trackEvent('click_telegram_support', { location: 'success' })}
+          >
             <Send size={17} aria-hidden="true" />
             Soporte por Telegram
           </a>
         </div>
       </section>
     </main>
+  );
+}
+
+function FloatingTelegramButton() {
+  return (
+    <a
+      className="floating-telegram"
+      href={telegramUrl}
+      rel="noreferrer"
+      target="_blank"
+      onClick={() => trackEvent('click_telegram_support', { location: 'floating' })}
+    >
+      <MessageCircle size={19} aria-hidden="true" />
+      <span>Telegram</span>
+    </a>
   );
 }
 
@@ -1011,23 +1225,31 @@ export default function App() {
   }
 
   const soldOut = availability.counter?.remainingCount <= 0;
+  const openCheckout = (location) => {
+    trackEvent('click_buy', { location });
+    setCheckoutOpen(true);
+  };
 
   return (
     <>
-      <Header onCheckout={() => setCheckoutOpen(true)} soldOut={soldOut} />
+      <Header onCheckout={openCheckout} soldOut={soldOut} />
       <main>
-        <Hero onCheckout={() => setCheckoutOpen(true)} soldOut={soldOut} />
+        <Hero onCheckout={openCheckout} soldOut={soldOut} />
         <MindShift />
+        <TelegramDoubtBand />
         <Technology
           counter={availability.counter}
-          onCheckout={() => setCheckoutOpen(true)}
+          onCheckout={openCheckout}
           soldOut={soldOut}
         />
+        <TelegramPremiumSection onCheckout={openCheckout} soldOut={soldOut} />
         <UrgencyBand availability={availability} />
+        <ActivationSection onCheckout={openCheckout} soldOut={soldOut} />
         <Testimonials />
         <FAQ />
       </main>
-      <FooterCta onCheckout={() => setCheckoutOpen(true)} soldOut={soldOut} />
+      <FooterCta onCheckout={openCheckout} soldOut={soldOut} />
+      <FloatingTelegramButton />
       <CheckoutModal
         availability={availability}
         open={checkoutOpen}

@@ -5,6 +5,7 @@ import cors from 'cors';
 import express from 'express';
 import { getConfig, getSafePublicUrl } from './config.js';
 import {
+  assignPremiumCodeForPayment,
   buildPaymentLinkUrl,
   completePaidPayment,
   createPendingPayment,
@@ -13,6 +14,7 @@ import {
   getPaymentStatus,
   normalizeEmail,
   normalizeName,
+  recordTrackingEvent,
   ServiceError,
 } from './payments.js';
 import { verifyStripeSignature } from './stripe-signature.js';
@@ -129,6 +131,42 @@ export function createApp() {
     response.json(payment);
   });
 
+  app.post('/api/track-event', async (request, response) => {
+    const eventName = typeof request.body?.eventName === 'string' ? request.body.eventName : '';
+    const paymentId =
+      typeof request.body?.paymentId === 'string' && validPaymentId(request.body.paymentId)
+        ? request.body.paymentId
+        : null;
+    const metadata =
+      request.body?.metadata && typeof request.body.metadata === 'object'
+        ? request.body.metadata
+        : null;
+
+    await recordTrackingEvent(eventName, { paymentId, metadata });
+    response.status(202).json({ ok: true });
+  });
+
+  app.post('/api/assign-premium-code', async (request, response) => {
+    const paymentId = typeof request.body?.paymentId === 'string' ? request.body.paymentId : '';
+
+    if (!validPaymentId(paymentId)) {
+      response.status(404).json({ error: 'Pago no encontrado' });
+      return;
+    }
+
+    response.set('Cache-Control', 'no-store');
+    const assignment = await assignPremiumCodeForPayment(paymentId);
+    const contentUrl = getSafePublicUrl(config.founderContentUrl);
+    const telegramUrl = getSafePublicUrl(config.telegramBotUrl);
+
+    response.json({
+      ...assignment,
+      contentConfigured: Boolean(contentUrl),
+      contentUrl: contentUrl || null,
+      telegramUrl: telegramUrl || null,
+    });
+  });
+
   app.get('/api/founder-access/:id', async (request, response) => {
     if (!validPaymentId(request.params.id)) {
       response.status(404).json({ error: 'Pago no encontrado' });
@@ -151,12 +189,16 @@ export function createApp() {
     }
 
     const contentUrl = getSafePublicUrl(config.founderContentUrl);
-    const telegramUrl = getSafePublicUrl(config.telegramBotUrl) || 'https://t.me/Kiryusbot';
+    const telegramUrl = getSafePublicUrl(config.telegramBotUrl);
 
     response.json({
+      paymentId: payment.id,
+      premiumCode: payment.premiumCode || null,
+      premiumCodeAssignedAt: payment.premiumCodeAssignedAt || null,
+      premiumCodeError: payment.premiumCodeError || null,
       contentConfigured: Boolean(contentUrl),
       contentUrl: contentUrl || null,
-      telegramUrl,
+      telegramUrl: telegramUrl || null,
     });
   });
 

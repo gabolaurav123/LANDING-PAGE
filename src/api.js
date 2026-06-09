@@ -52,8 +52,27 @@ export function fetchPaymentStatus(paymentId) {
   });
 }
 
+export function assignPremiumCode(paymentId) {
+  return apiRequest('/api/assign-premium-code', {
+    method: 'POST',
+    body: JSON.stringify({ paymentId }),
+  });
+}
+
 export function fetchFounderAccess(paymentId) {
   return apiRequest(`/api/founder-access/${encodeURIComponent(paymentId)}`, {
     cache: 'no-store',
   });
+}
+
+export async function trackEvent(eventName, metadata = {}) {
+  try {
+    const paymentId = localStorage.getItem('paymentId');
+    await apiRequest('/api/track-event', {
+      method: 'POST',
+      body: JSON.stringify({ eventName, paymentId, metadata }),
+    });
+  } catch {
+    // Tracking must never block the landing or checkout flow.
+  }
 }

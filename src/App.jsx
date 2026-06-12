@@ -823,11 +823,16 @@ function CheckoutModal({ availability, onClose, open }) {
       }
 
       setStatusMessage('Guardando tus datos...');
+      const sheetPayload = {
+        ...data,
+        status: 'Pendiente de pago',
+      };
+
       await fetch(SHIPPING_FORM_ENDPOINT, {
         method: 'POST',
         mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(sheetPayload),
       });
       shippingSaved = true;
 

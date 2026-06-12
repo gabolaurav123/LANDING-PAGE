@@ -174,136 +174,118 @@ export async function recordTrackingEvent(
   );
 }
 
-export async function assignPremiumCodeForPayment(paymentId, database = getPool()) {
+function normalizeOptionalText(value, maxLength = 320) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text ? text.slice(0, maxLength) : null;
+}
+
+export async function claimPremiumCodeForOrder(
+  { customerEmail, customerName, orderId },
+  database = getPool(),
+) {
+  const normalizedOrderId = normalizeOptionalText(orderId, 200);
+
+  if (!normalizedOrderId) {
+    throw new ServiceError('Falta el identificador de la orden.', 400, 'ORDER_ID_REQUIRED');
+  }
+
+  const normalizedEmail = normalizeOptionalText(customerEmail, 320)?.toLowerCase() ?? null;
+  const normalizedName = normalizeOptionalText(customerName, 120);
   const client = await database.connect();
 
   try {
     await client.query('BEGIN');
-    const paymentResult = await client.query(
-      `SELECT
-         id,
-         email,
-         name,
-         status,
-         premium_code AS "premiumCode",
-         premium_code_assigned_at AS "premiumCodeAssignedAt"
-       FROM payments
-       WHERE id = $1
-       FOR UPDATE`,
-      [paymentId],
+
+    const existingDelivery = await client.query(
+      `SELECT code
+       FROM landing_code_deliveries
+       WHERE order_id = $1
+       LIMIT 1`,
+      [normalizedOrderId],
     );
 
-    if (paymentResult.rowCount === 0) {
-      throw new ServiceError('Pago no encontrado', 404, 'PAYMENT_NOT_FOUND');
-    }
-
-    const payment = paymentResult.rows[0];
-
-    if (payment.status !== 'paid') {
-      throw new ServiceError(
-        'El pago todavia no esta confirmado.',
-        403,
-        'PAYMENT_NOT_PAID',
-      );
-    }
-
-    if (payment.premiumCode) {
+    if (existingDelivery.rowCount > 0) {
       await client.query('COMMIT');
       return {
-        paymentId: payment.id,
-        email: payment.email,
-        name: payment.name,
-        premiumCode: payment.premiumCode,
-        premiumCodeAssignedAt: payment.premiumCodeAssignedAt,
-        codeStatus: 'reserved',
-        noCodesAvailable: false,
+        success: true,
+        code: existingDelivery.rows[0].code,
+        alreadyDelivered: true,
+      };
+    }
+
+    const paymentResult = await client.query(
+      `SELECT id, email, name, status
+       FROM payments
+       WHERE id = $1
+       LIMIT 1`,
+      [normalizedOrderId],
+    );
+
+    const payment = paymentResult.rows[0] ?? null;
+
+    if (!payment || payment.status !== 'paid') {
+      await client.query('COMMIT');
+      return {
+        success: false,
+        message: 'El pago todavía no está confirmado.',
       };
     }
 
     const codeResult = await client.query(
-      `SELECT id, code
-       FROM premium_codes
-       WHERE status = 'available'
-       ORDER BY id ASC
-       FOR UPDATE SKIP LOCKED
-       LIMIT 1`,
+      `WITH next_code AS (
+         SELECT pc.code
+         FROM premium_codes pc
+         WHERE pc.status = 'available'
+           AND pc.code LIKE 'BIOSHIELD-%'
+           AND NOT EXISTS (
+             SELECT 1
+             FROM landing_code_deliveries lcd
+             WHERE lcd.code = pc.code
+         )
+         ORDER BY pc.created_at ASC, pc.id ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED
+       )
+       INSERT INTO landing_code_deliveries (code, customer_email, customer_name, order_id)
+       SELECT code, $1, $2, $3
+       FROM next_code
+       RETURNING code`,
+      [
+        normalizedEmail ?? payment.email,
+        normalizedName ?? payment.name,
+        normalizedOrderId,
+      ],
     );
 
-    if (codeResult.rowCount === 0) {
-      await client.query(
-        `UPDATE payments
-         SET premium_code_error = 'NO_CODES_AVAILABLE'
-         WHERE id = $1`,
-        [payment.id],
-      );
+    if (codeResult.rowCount > 0) {
+      const code = codeResult.rows[0].code;
+
       await recordTrackingEvent(
-        'premium_code_error',
+        'premium_code_assigned',
         {
-          paymentId: payment.id,
-          email: payment.email,
-          metadata: { reason: 'NO_CODES_AVAILABLE' },
+          paymentId: normalizedOrderId,
+          email: normalizedEmail ?? payment.email,
+          metadata: { source: 'landing_code_deliveries' },
         },
         client,
       );
       await client.query('COMMIT');
-      return {
-        paymentId: payment.id,
-        email: payment.email,
-        name: payment.name,
-        premiumCode: null,
-        premiumCodeAssignedAt: null,
-        codeStatus: 'pending',
-        noCodesAvailable: true,
-      };
+      return { success: true, code };
     }
 
-    const premiumCode = codeResult.rows[0];
-
-    await client.query(
-      `UPDATE premium_codes
-       SET
-         status = 'reserved',
-         reserved_at = NOW(),
-         assigned_email = $2,
-         assigned_order_id = $3,
-         assigned_payment_id = $3,
-         assigned_source = 'landing',
-         delivered_at = NOW()
-       WHERE id = $1`,
-      [premiumCode.id, payment.email, payment.id],
-    );
-
-    const updatedPayment = await client.query(
-      `UPDATE payments
-       SET
-         premium_code_id = $2,
-         premium_code = $3,
-         premium_code_assigned_at = NOW(),
-         premium_code_error = NULL
-       WHERE id = $1
-       RETURNING premium_code_assigned_at AS "premiumCodeAssignedAt"`,
-      [payment.id, String(premiumCode.id), premiumCode.code],
-    );
-
     await recordTrackingEvent(
-      'premium_code_assigned',
+      'premium_code_error',
       {
-        paymentId: payment.id,
-        email: payment.email,
-        metadata: { premiumCodeId: String(premiumCode.id) },
+        paymentId: normalizedOrderId,
+        email: normalizedEmail ?? payment.email,
+        metadata: { reason: 'NO_BIOSHIELD_CODES_AVAILABLE' },
       },
       client,
     );
     await client.query('COMMIT');
-
     return {
-      paymentId: payment.id,
-      email: payment.email,
-      name: payment.name,
-      premiumCode: premiumCode.code,
-      premiumCodeAssignedAt: updatedPayment.rows[0]?.premiumCodeAssignedAt ?? null,
-      codeStatus: 'reserved',
-      noCodesAvailable: false,
+      success: false,
+      message: 'No hay códigos disponibles en este momento.',
     };
   } catch (error) {
     try {
@@ -311,6 +293,25 @@ export async function assignPremiumCodeForPayment(paymentId, database = getPool(
     } catch {
       // The original database error is more useful than a rollback failure.
     }
+
+    if (error?.code === '23505') {
+      const existingDelivery = await database.query(
+        `SELECT code
+         FROM landing_code_deliveries
+         WHERE order_id = $1
+         LIMIT 1`,
+        [normalizedOrderId],
+      );
+
+      if (existingDelivery.rowCount > 0) {
+        return {
+          success: true,
+          code: existingDelivery.rows[0].code,
+          alreadyDelivered: true,
+        };
+      }
+    }
+
     throw error;
   } finally {
     client.release();
@@ -401,70 +402,6 @@ export async function completePaidPayment(session, database = getPool()) {
       },
       client,
     );
-
-    const premiumCodeResult = await client.query(
-      `SELECT id, code
-       FROM premium_codes
-       WHERE status = 'available'
-       ORDER BY id ASC
-       FOR UPDATE SKIP LOCKED
-       LIMIT 1`,
-    );
-
-    if (premiumCodeResult.rowCount === 1) {
-      const premiumCode = premiumCodeResult.rows[0];
-
-      await client.query(
-        `UPDATE premium_codes
-         SET
-           status = 'reserved',
-           reserved_at = NOW(),
-           assigned_email = $2,
-           assigned_order_id = $3,
-           assigned_payment_id = $3,
-           assigned_source = 'landing',
-           delivered_at = NOW()
-         WHERE id = $1`,
-        [premiumCode.id, customerEmail ?? payment.email, paymentId],
-      );
-
-      await client.query(
-        `UPDATE payments
-         SET
-           premium_code_id = $2,
-           premium_code = $3,
-           premium_code_assigned_at = NOW(),
-           premium_code_error = NULL
-         WHERE id = $1`,
-        [paymentId, String(premiumCode.id), premiumCode.code],
-      );
-
-      await recordTrackingEvent(
-        'premium_code_assigned',
-        {
-          paymentId,
-          email: customerEmail ?? payment.email,
-          metadata: { premiumCodeId: String(premiumCode.id), source: 'webhook' },
-        },
-        client,
-      );
-    } else {
-      await client.query(
-        `UPDATE payments
-         SET premium_code_error = 'NO_CODES_AVAILABLE'
-         WHERE id = $1`,
-        [paymentId],
-      );
-      await recordTrackingEvent(
-        'premium_code_error',
-        {
-          paymentId,
-          email: customerEmail ?? payment.email,
-          metadata: { reason: 'NO_CODES_AVAILABLE', source: 'webhook' },
-        },
-        client,
-      );
-    }
 
     await client.query('COMMIT');
     return {

@@ -81,3 +81,16 @@ CREATE TABLE IF NOT EXISTS tracking_events (
 
 CREATE INDEX IF NOT EXISTS idx_tracking_events_event_name ON tracking_events(event_name);
 CREATE INDEX IF NOT EXISTS idx_tracking_events_payment_id ON tracking_events(payment_id);
+
+CREATE TABLE IF NOT EXISTS landing_code_deliveries (
+  id SERIAL PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  customer_email TEXT,
+  customer_name TEXT,
+  order_id TEXT,
+  delivered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_landing_code_deliveries_order_id
+  ON landing_code_deliveries(order_id)
+  WHERE order_id IS NOT NULL;

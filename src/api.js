@@ -52,10 +52,14 @@ export function fetchPaymentStatus(paymentId) {
   });
 }
 
-export function assignPremiumCode(paymentId) {
-  return apiRequest('/api/assign-premium-code', {
+export function claimPremiumCode({ orderId, customerEmail, customerName }) {
+  return apiRequest('/api/claim-premium-code', {
     method: 'POST',
-    body: JSON.stringify({ paymentId }),
+    body: JSON.stringify({
+      order_id: orderId,
+      customer_email: customerEmail,
+      customer_name: customerName,
+    }),
   });
 }
 

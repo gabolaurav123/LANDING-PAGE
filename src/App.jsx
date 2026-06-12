@@ -34,7 +34,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { assignPremiumCode, createPayment, fetchPaymentStatus, trackEvent } from './api.js';
+import { claimPremiumCode, createPayment, fetchPaymentStatus, trackEvent } from './api.js';
 import { useAvailability } from './useAvailability.js';
 
 const PRODUCT_NAME = 'BioShield by KIRYUS™';
@@ -1088,7 +1088,7 @@ function PremiumAccessPanel({ access, error }) {
   const accessPending = !access && !error;
   const accessTelegramUrl = access?.telegramUrl || telegramUrl;
   const hasCode = Boolean(access?.premiumCode);
-  const waitingForCode = access?.noCodesAvailable || access?.codeStatus === 'pending';
+  const waitingForCode = access?.success === false || access?.noCodesAvailable || access?.codeStatus === 'pending';
 
   const copyCode = async () => {
     if (!access?.premiumCode) return;
@@ -1132,18 +1132,18 @@ function PremiumAccessPanel({ access, error }) {
             <strong>{access.premiumCode}</strong>
           </div>
           <ol className="activation-steps">
-            <li>Abre el bot oficial de Telegram.</li>
-            <li>Toca Activar código premium.</li>
-            <li>Pega tu código.</li>
-            <li>Accede al contenido premium de {PRODUCT_NAME}.</li>
+            <li>Guarda este código.</li>
+            <li>Abre el bot de Telegram.</li>
+            <li>Toca Activar código premium y escribe este código exactamente como aparece.</li>
+            <li>Solo se puede activar una vez. Si tienes problemas, contacta soporte.</li>
           </ol>
         </>
       )}
 
       {waitingForCode && (
         <p>
-          Tu compra fue recibida correctamente, pero estamos generando tu código premium. Por favor
-          contacta al soporte oficial de Telegram para recibir ayuda.
+          {access?.message ||
+            'No hay códigos disponibles en este momento. Escríbenos para ayudarte.'}
         </p>
       )}
 
@@ -1231,9 +1231,21 @@ function SuccessPage() {
           setPhase('paid');
           availability.refresh();
           try {
-            const access = await assignPremiumCode(paymentId);
+            const claim = await claimPremiumCode({
+              orderId: paymentId,
+              customerEmail: nextPayment.email,
+              customerName: nextPayment.name,
+            });
             if (!active) return;
-            setPremiumAccess(access);
+            setPremiumAccess({
+              success: claim.success,
+              premiumCode: claim.code || null,
+              message:
+                claim.message ||
+                (claim.success ? '' : 'No hay códigos disponibles en este momento. Escríbenos para ayudarte.'),
+              telegramUrl,
+              contentConfigured: false,
+            });
             setPremiumAccessError('');
           } catch {
             if (!active) return;

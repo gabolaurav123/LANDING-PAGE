@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  assignPremiumCodeForPayment,
   buildPaymentLinkUrl,
+  claimPremiumCodeForOrder,
   completePaidPayment,
   getFounderAccessPayment,
   normalizeEmail,
@@ -33,7 +33,6 @@ test('completePaidPayment increments availability only on the first paid transit
   let paymentStatus = 'pending';
   let counterUpdates = 0;
   let paymentUpdates = 0;
-  let premiumCodeUpdates = 0;
 
   const client = {
     async query(sql) {
@@ -63,19 +62,6 @@ test('completePaidPayment increments availability only on the first paid transit
         return { rowCount: 1, rows: [] };
       }
 
-      if (sql.includes('FROM premium_codes') && sql.includes("status = 'available'")) {
-        return { rowCount: 1, rows: [{ id: 9, code: 'PREMIUM-009' }] };
-      }
-
-      if (sql.includes('UPDATE premium_codes')) {
-        premiumCodeUpdates += 1;
-        return { rowCount: 1, rows: [] };
-      }
-
-      if (sql.includes('UPDATE payments') && sql.includes('premium_code_id')) {
-        return { rowCount: 1, rows: [] };
-      }
-
       if (sql.includes('INSERT INTO tracking_events')) {
         return { rowCount: 1, rows: [] };
       }
@@ -102,7 +88,6 @@ test('completePaidPayment increments availability only on the first paid transit
   assert.deepEqual(await completePaidPayment(session, database), { outcome: 'already_paid' });
   assert.equal(counterUpdates, 1);
   assert.equal(paymentUpdates, 1);
-  assert.equal(premiumCodeUpdates, 1);
 });
 
 test('getFounderAccessPayment returns payment status for access checks', async () => {
@@ -137,14 +122,19 @@ test('getFounderAccessPayment returns payment status for access checks', async (
   });
 });
 
-test('assignPremiumCodeForPayment reserves one available code for a paid payment', async () => {
-  let codeReserved = false;
-  let paymentUpdated = false;
+test('claimPremiumCodeForOrder records a BIOSHIELD code delivery without marking it used', async () => {
+  let premiumCodeUpdated = false;
+  let deliveryInserted = false;
   let eventInserted = false;
 
   const client = {
     async query(sql, params) {
-      if (sql.includes('SELECT') && sql.includes('FROM payments') && sql.includes('FOR UPDATE')) {
+      if (sql.includes('FROM landing_code_deliveries') && sql.includes('WHERE order_id')) {
+        assert.deepEqual(params, ['pay_test']);
+        return { rowCount: 0, rows: [] };
+      }
+
+      if (sql.includes('FROM payments') && sql.includes('WHERE id = $1')) {
         assert.deepEqual(params, ['pay_test']);
         return {
           rowCount: 1,
@@ -154,29 +144,22 @@ test('assignPremiumCodeForPayment reserves one available code for a paid payment
               email: 'buyer@example.com',
               name: 'Buyer',
               status: 'paid',
-              premiumCode: null,
             },
           ],
         };
       }
 
-      if (sql.includes('FROM premium_codes') && sql.includes("status = 'available'")) {
-        return { rowCount: 1, rows: [{ id: 7, code: 'PREMIUM-001' }] };
-      }
-
-      if (sql.includes('UPDATE premium_codes')) {
-        codeReserved = true;
-        assert.deepEqual(params, [7, 'buyer@example.com', 'pay_test']);
+      if (sql.trimStart().startsWith('UPDATE') && sql.includes('premium_codes')) {
+        premiumCodeUpdated = true;
         return { rowCount: 1, rows: [] };
       }
 
-      if (sql.includes('UPDATE payments') && sql.includes('premium_code_id')) {
-        paymentUpdated = true;
-        assert.deepEqual(params, ['pay_test', '7', 'PREMIUM-001']);
-        return {
-          rowCount: 1,
-          rows: [{ premiumCodeAssignedAt: new Date('2026-06-09T00:00:00Z') }],
-        };
+      if (sql.includes('INSERT INTO landing_code_deliveries')) {
+        deliveryInserted = true;
+        assert.deepEqual(params, ['buyer@example.com', 'Buyer', 'pay_test']);
+        assert.ok(sql.includes("pc.code LIKE 'BIOSHIELD-%'"));
+        assert.ok(sql.includes("pc.status = 'available'"));
+        return { rowCount: 1, rows: [{ code: 'BIOSHIELD-2710' }] };
       }
 
       if (sql.includes('INSERT INTO tracking_events')) {
@@ -190,35 +173,29 @@ test('assignPremiumCodeForPayment reserves one available code for a paid payment
   };
   const database = { async connect() { return client; } };
 
-  const result = await assignPremiumCodeForPayment('pay_test', database);
+  const result = await claimPremiumCodeForOrder(
+    {
+      customerEmail: 'buyer@example.com',
+      customerName: 'Buyer',
+      orderId: 'pay_test',
+    },
+    database,
+  );
 
-  assert.equal(result.premiumCode, 'PREMIUM-001');
-  assert.equal(result.codeStatus, 'reserved');
-  assert.equal(result.noCodesAvailable, false);
-  assert.equal(codeReserved, true);
-  assert.equal(paymentUpdated, true);
+  assert.deepEqual(result, { success: true, code: 'BIOSHIELD-2710' });
+  assert.equal(deliveryInserted, true);
   assert.equal(eventInserted, true);
+  assert.equal(premiumCodeUpdated, false);
 });
 
-test('assignPremiumCodeForPayment is idempotent when payment already has a code', async () => {
+test('claimPremiumCodeForOrder returns an existing delivery for the same order id', async () => {
   let codeQueried = false;
 
   const client = {
-    async query(sql) {
-      if (sql.includes('SELECT') && sql.includes('FROM payments') && sql.includes('FOR UPDATE')) {
-        return {
-          rowCount: 1,
-          rows: [
-            {
-              id: 'pay_test',
-              email: 'buyer@example.com',
-              name: 'Buyer',
-              status: 'paid',
-              premiumCode: 'PREMIUM-001',
-              premiumCodeAssignedAt: '2026-06-09T00:00:00.000Z',
-            },
-          ],
-        };
+    async query(sql, params) {
+      if (sql.includes('FROM landing_code_deliveries') && sql.includes('WHERE order_id')) {
+        assert.deepEqual(params, ['pay_test']);
+        return { rowCount: 1, rows: [{ code: 'BIOSHIELD-2710' }] };
       }
 
       if (sql.includes('FROM premium_codes')) {
@@ -231,24 +208,28 @@ test('assignPremiumCodeForPayment is idempotent when payment already has a code'
   };
   const database = { async connect() { return client; } };
 
-  assert.deepEqual(await assignPremiumCodeForPayment('pay_test', database), {
-    paymentId: 'pay_test',
-    email: 'buyer@example.com',
-    name: 'Buyer',
-    premiumCode: 'PREMIUM-001',
-    premiumCodeAssignedAt: '2026-06-09T00:00:00.000Z',
-    codeStatus: 'reserved',
-    noCodesAvailable: false,
-  });
+  assert.deepEqual(
+    await claimPremiumCodeForOrder(
+      { customerEmail: 'buyer@example.com', customerName: 'Buyer', orderId: 'pay_test' },
+      database,
+    ),
+    { success: true, code: 'BIOSHIELD-2710', alreadyDelivered: true },
+  );
   assert.equal(codeQueried, false);
 });
 
-test('assignPremiumCodeForPayment returns pending when no codes are available', async () => {
+test('claimPremiumCodeForOrder returns false when no BIOSHIELD codes are available', async () => {
   let errorRecorded = false;
 
   const client = {
-    async query(sql) {
-      if (sql.includes('SELECT') && sql.includes('FROM payments') && sql.includes('FOR UPDATE')) {
+    async query(sql, params) {
+      if (sql.includes('FROM landing_code_deliveries') && sql.includes('WHERE order_id')) {
+        assert.deepEqual(params, ['pay_test']);
+        return { rowCount: 0, rows: [] };
+      }
+
+      if (sql.includes('FROM payments') && sql.includes('WHERE id = $1')) {
+        assert.deepEqual(params, ['pay_test']);
         return {
           rowCount: 1,
           rows: [
@@ -257,17 +238,16 @@ test('assignPremiumCodeForPayment returns pending when no codes are available', 
               email: 'buyer@example.com',
               name: 'Buyer',
               status: 'paid',
-              premiumCode: null,
             },
           ],
         };
       }
 
-      if (sql.includes('FROM premium_codes') && sql.includes("status = 'available'")) {
+      if (sql.includes('INSERT INTO landing_code_deliveries')) {
         return { rowCount: 0, rows: [] };
       }
 
-      if (sql.includes("premium_code_error = 'NO_CODES_AVAILABLE'")) {
+      if (sql.includes('INSERT INTO tracking_events')) {
         errorRecorded = true;
         return { rowCount: 1, rows: [] };
       }
@@ -278,10 +258,14 @@ test('assignPremiumCodeForPayment returns pending when no codes are available', 
   };
   const database = { async connect() { return client; } };
 
-  const result = await assignPremiumCodeForPayment('pay_test', database);
+  const result = await claimPremiumCodeForOrder(
+    { customerEmail: 'buyer@example.com', customerName: 'Buyer', orderId: 'pay_test' },
+    database,
+  );
 
-  assert.equal(result.premiumCode, null);
-  assert.equal(result.codeStatus, 'pending');
-  assert.equal(result.noCodesAvailable, true);
+  assert.deepEqual(result, {
+    success: false,
+    message: 'No hay códigos disponibles en este momento.',
+  });
   assert.equal(errorRecorded, true);
 });

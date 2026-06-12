@@ -58,16 +58,22 @@ estado real guardado por el webhook.
 ## Codigos premium
 
 Los codigos premium se guardan en la tabla `premium_codes`. No deben ponerse en React, HTML ni en
-archivos publicos. Para cargar codigos nuevos, insertalos en Neon con `status = 'available'`; la
-landing los reserva de forma transaccional cuando un pago confirmado solicita su acceso premium.
+archivos publicos. Para cargar codigos nuevos, insertalos en Neon con formato `BIOSHIELD-####` y
+`status = 'available'`.
 
-Si no quedan codigos disponibles, el comprador ve un mensaje de soporte en Telegram y el evento
-`premium_code_error` queda registrado para revision.
+La landing no marca codigos como `used` ni cambia `premium_codes.status`. Cuando un pago confirmado
+solicita su acceso premium, el backend toma el siguiente codigo `BIOSHIELD-%` disponible y registra
+la entrega en `landing_code_deliveries`. Si el mismo `order_id` vuelve a solicitar codigo, recibe el
+mismo codigo.
+
+El bot de Telegram es quien debe cambiar `premium_codes.status` a `used` cuando el usuario activa el
+codigo. Si no quedan codigos disponibles, el comprador ve un mensaje de soporte en Telegram y el
+evento `premium_code_error` queda registrado para revision.
 
 ## Contenido digital
 
 La seccion privada de `/success` aparece solo cuando el pago esta confirmado como `paid`. En ese
-momento el backend reserva un codigo de `premium_codes` y lo muestra al comprador. Si tambien quieres
+momento el backend entrega un codigo registrado en `landing_code_deliveries` y lo muestra al comprador. Si tambien quieres
 mostrar una carpeta de Google Drive con guia digital y audios Neurofocus, agrega:
 
 ```dotenv

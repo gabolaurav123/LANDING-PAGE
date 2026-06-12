@@ -5,8 +5,8 @@ import cors from 'cors';
 import express from 'express';
 import { getConfig, getSafePublicUrl } from './config.js';
 import {
-  assignPremiumCodeForPayment,
   buildPaymentLinkUrl,
+  claimPremiumCodeForOrder,
   completePaidPayment,
   createPendingPayment,
   getCounterState,
@@ -146,26 +146,52 @@ export function createApp() {
     response.status(202).json({ ok: true });
   });
 
-  app.post('/api/assign-premium-code', async (request, response) => {
-    const paymentId = typeof request.body?.paymentId === 'string' ? request.body.paymentId : '';
+  const claimPremiumCodeHandler = async (request, response) => {
+    const orderId =
+      typeof request.body?.order_id === 'string'
+        ? request.body.order_id
+        : typeof request.body?.orderId === 'string'
+          ? request.body.orderId
+          : typeof request.body?.paymentId === 'string'
+            ? request.body.paymentId
+            : '';
 
-    if (!validPaymentId(paymentId)) {
-      response.status(404).json({ error: 'Pago no encontrado' });
+    if (!validPaymentId(orderId)) {
+      response.status(400).json({
+        success: false,
+        message: 'Falta el identificador de la orden.',
+      });
       return;
     }
 
-    response.set('Cache-Control', 'no-store');
-    const assignment = await assignPremiumCodeForPayment(paymentId);
-    const contentUrl = getSafePublicUrl(config.founderContentUrl);
-    const telegramUrl = getSafePublicUrl(config.telegramBotUrl);
+    try {
+      response.set('Cache-Control', 'no-store');
+      const result = await claimPremiumCodeForOrder({
+        customerEmail: request.body?.customer_email ?? request.body?.customerEmail,
+        customerName: request.body?.customer_name ?? request.body?.customerName,
+        orderId,
+      });
 
-    response.json({
-      ...assignment,
-      contentConfigured: Boolean(contentUrl),
-      contentUrl: contentUrl || null,
-      telegramUrl: telegramUrl || null,
-    });
-  });
+      if (result.success) {
+        response.json({ success: true, code: result.code });
+        return;
+      }
+
+      response.json({
+        success: false,
+        message: result.message || 'No hay códigos disponibles en este momento.',
+      });
+    } catch (error) {
+      console.error('Premium code claim failed');
+      response.status(500).json({
+        success: false,
+        message: 'No se pudo entregar el código en este momento.',
+      });
+    }
+  };
+
+  app.post('/api/claim-premium-code', claimPremiumCodeHandler);
+  app.post('/api/assign-premium-code', claimPremiumCodeHandler);
 
   app.get('/api/founder-access/:id', async (request, response) => {
     if (!validPaymentId(request.params.id)) {

@@ -12,14 +12,18 @@ import {
   CreditCard,
   Flower2,
   HeartPulse,
+  Home,
   KeyRound,
   LoaderCircle,
   LockKeyhole,
   Mail,
+  MapPin,
   Menu,
   MessageCircle,
   Music,
+  NotebookPen,
   PackageCheck,
+  Phone,
   Send,
   ShieldCheck,
   Smartphone,
@@ -35,6 +39,34 @@ import { useAvailability } from './useAvailability.js';
 
 const PRODUCT_NAME = 'BioShield by KIRYUS™';
 const telegramUrl = import.meta.env.VITE_TELEGRAM_BOT_URL || 'https://t.me/Kiryusbot';
+const SHIPPING_FORM_ENDPOINT =
+  'https://script.google.com/macros/s/AKfycbzX0AR_nijmihCfUawqWcc5URHdMZwHpkV8IqUDXVmeN6q7rlQbLXmJGYBpLoDgdt9/exec';
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emptyShippingForm = {
+  fullName: '',
+  email: '',
+  phone: '',
+  country: '',
+  city: '',
+  address: '',
+  postalCode: '',
+  addressReference: '',
+  notes: '',
+};
+
+function normalizeShippingForm(form) {
+  return {
+    fullName: form.fullName.trim().replace(/\s+/g, ' '),
+    email: form.email.trim().toLowerCase(),
+    phone: form.phone.trim().replace(/\s+/g, ' '),
+    country: form.country.trim().replace(/\s+/g, ' '),
+    city: form.city.trim().replace(/\s+/g, ' '),
+    address: form.address.trim().replace(/\s+/g, ' '),
+    postalCode: form.postalCode.trim().replace(/\s+/g, ' '),
+    addressReference: form.addressReference.trim().replace(/\s+/g, ' '),
+    notes: form.notes.trim().replace(/\s+/g, ' '),
+  };
+}
 
 const navItems = [
   { label: 'Beneficios', href: '#beneficios' },
@@ -707,9 +739,9 @@ function FooterCta({ onCheckout, soldOut }) {
 }
 
 function CheckoutModal({ availability, onClose, open }) {
-  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-  const [name, setName] = useState('');
+  const [shippingForm, setShippingForm] = useState(emptyShippingForm);
+  const [statusMessage, setStatusMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -730,21 +762,52 @@ function CheckoutModal({ availability, onClose, open }) {
 
   if (!open) return null;
 
+  const updateShippingField = (field) => (event) => {
+    setShippingForm((current) => ({
+      ...current,
+      [field]: event.target.value,
+    }));
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
+    setStatusMessage('');
 
-    if (!name.trim()) {
-      setError('Ingresa tu nombre.');
+    const data = normalizeShippingForm(shippingForm);
+
+    if (!data.fullName) {
+      setError('Ingresa tu nombre completo.');
       return;
     }
 
-    if (!email.trim()) {
-      setError('Ingresa tu correo electrónico.');
+    if (!data.email || !emailPattern.test(data.email)) {
+      setError('Ingresa un correo electrónico válido.');
+      return;
+    }
+
+    if (!data.phone) {
+      setError('Ingresa tu WhatsApp o teléfono.');
+      return;
+    }
+
+    if (!data.country) {
+      setError('Ingresa tu país.');
+      return;
+    }
+
+    if (!data.city) {
+      setError('Ingresa tu ciudad.');
+      return;
+    }
+
+    if (!data.address) {
+      setError('Ingresa tu dirección completa.');
       return;
     }
 
     setSubmitting(true);
+    let shippingSaved = false;
 
     try {
       const latestCounter = await availability.refresh();
@@ -759,11 +822,26 @@ function CheckoutModal({ availability, onClose, open }) {
         return;
       }
 
-      const payment = await createPayment({ email, name });
+      setStatusMessage('Guardando tus datos...');
+      await fetch(SHIPPING_FORM_ENDPOINT, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      shippingSaved = true;
+
+      setStatusMessage('Datos guardados. Redirigiendo al pago...');
+      const payment = await createPayment({ email: data.email, name: data.fullName });
       localStorage.setItem('paymentId', payment.paymentId);
       window.location.assign(payment.url);
     } catch (requestError) {
-      setError(requestError.message || 'No se pudo iniciar el pago.');
+      setStatusMessage('');
+      setError(
+        shippingSaved
+          ? requestError.message || 'Tus datos fueron guardados, pero no pudimos iniciar el pago.'
+          : 'No se pudieron guardar tus datos. Intenta nuevamente.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -798,14 +876,13 @@ function CheckoutModal({ availability, onClose, open }) {
         <div className="checkout-heading">
           <img src="/assets/kiryus-logo.png" alt="" />
           <div>
-            <span>Edición Founder</span>
-            <h2 id="checkout-title">Comprar {PRODUCT_NAME}</h2>
+            <span>{PRODUCT_NAME}</span>
+            <h2 id="checkout-title">Datos de envío</h2>
           </div>
         </div>
 
         <p className="checkout-intro">
-          Completa tus datos. Crearemos tu reserva, te enviaremos al pago seguro de Stripe y, al
-          confirmarse el pago, recibirás tu código premium para Telegram.
+          Completa tus datos para preparar tu pedido. Después continuarás al pago seguro con Stripe.
         </p>
 
         {availability.counter && (
@@ -815,44 +892,164 @@ function CheckoutModal({ availability, onClose, open }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <label>
-            Nombre
-            <span className="input-shell">
-              <UserRound size={18} aria-hidden="true" />
-              <input
-                autoComplete="name"
-                maxLength={120}
-                name="name"
-                placeholder="Tu nombre"
-                required
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </span>
-          </label>
-          <label>
-            Correo electrónico
-            <span className="input-shell">
-              <Mail size={18} aria-hidden="true" />
-              <input
-                autoComplete="email"
-                maxLength={320}
-                name="email"
-                placeholder="correo@ejemplo.com"
-                required
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </span>
-          </label>
+        <form noValidate onSubmit={handleSubmit}>
+          <div className="shipping-form-grid">
+            <label>
+              Nombre completo
+              <span className="input-shell">
+                <UserRound size={18} aria-hidden="true" />
+                <input
+                  autoComplete="name"
+                  maxLength={120}
+                  name="fullName"
+                  placeholder="Nombre completo"
+                  required
+                  type="text"
+                  value={shippingForm.fullName}
+                  onChange={updateShippingField('fullName')}
+                />
+              </span>
+            </label>
+            <label>
+              Correo electrónico
+              <span className="input-shell">
+                <Mail size={18} aria-hidden="true" />
+                <input
+                  autoComplete="email"
+                  maxLength={320}
+                  name="email"
+                  placeholder="correo@ejemplo.com"
+                  required
+                  type="email"
+                  value={shippingForm.email}
+                  onChange={updateShippingField('email')}
+                />
+              </span>
+            </label>
+            <label>
+              WhatsApp / Teléfono
+              <span className="input-shell">
+                <Phone size={18} aria-hidden="true" />
+                <input
+                  autoComplete="tel"
+                  maxLength={40}
+                  name="phone"
+                  placeholder="+591 70000000"
+                  required
+                  type="tel"
+                  value={shippingForm.phone}
+                  onChange={updateShippingField('phone')}
+                />
+              </span>
+            </label>
+            <label>
+              País
+              <span className="input-shell">
+                <MapPin size={18} aria-hidden="true" />
+                <input
+                  autoComplete="country-name"
+                  maxLength={80}
+                  name="country"
+                  placeholder="País"
+                  required
+                  type="text"
+                  value={shippingForm.country}
+                  onChange={updateShippingField('country')}
+                />
+              </span>
+            </label>
+            <label>
+              Ciudad
+              <span className="input-shell">
+                <MapPin size={18} aria-hidden="true" />
+                <input
+                  autoComplete="address-level2"
+                  maxLength={80}
+                  name="city"
+                  placeholder="Ciudad"
+                  required
+                  type="text"
+                  value={shippingForm.city}
+                  onChange={updateShippingField('city')}
+                />
+              </span>
+            </label>
+            <label>
+              Código postal
+              <span className="input-shell">
+                <PackageCheck size={18} aria-hidden="true" />
+                <input
+                  autoComplete="postal-code"
+                  maxLength={30}
+                  name="postalCode"
+                  placeholder="Opcional"
+                  type="text"
+                  value={shippingForm.postalCode}
+                  onChange={updateShippingField('postalCode')}
+                />
+              </span>
+            </label>
+            <label className="form-field--wide">
+              Dirección completa
+              <span className="input-shell">
+                <Home size={18} aria-hidden="true" />
+                <input
+                  autoComplete="street-address"
+                  maxLength={220}
+                  name="address"
+                  placeholder="Calle, número, zona, edificio, departamento"
+                  required
+                  type="text"
+                  value={shippingForm.address}
+                  onChange={updateShippingField('address')}
+                />
+              </span>
+            </label>
+            <label className="form-field--wide">
+              Referencia de domicilio
+              <span className="input-shell">
+                <Home size={18} aria-hidden="true" />
+                <input
+                  maxLength={180}
+                  name="addressReference"
+                  placeholder="Opcional"
+                  type="text"
+                  value={shippingForm.addressReference}
+                  onChange={updateShippingField('addressReference')}
+                />
+              </span>
+            </label>
+            <label className="form-field--wide">
+              Notas adicionales
+              <span className="input-shell input-shell--textarea">
+                <NotebookPen size={18} aria-hidden="true" />
+                <textarea
+                  maxLength={300}
+                  name="notes"
+                  placeholder="Opcional"
+                  rows={3}
+                  value={shippingForm.notes}
+                  onChange={updateShippingField('notes')}
+                />
+              </span>
+            </label>
+          </div>
+
+          <p className="privacy-note">
+            Tus datos serán usados únicamente para gestionar tu pedido y envío.
+          </p>
 
           {error && (
             <p className="form-error" role="alert">
               <AlertCircle size={17} aria-hidden="true" />
               {error}
+            </p>
+          )}
+
+          {statusMessage && (
+            <p className="form-status" role="status">
+              <LoaderCircle className="is-spinning" size={17} aria-hidden="true" />
+              {statusMessage}
             </p>
           )}
 
@@ -865,8 +1062,8 @@ function CheckoutModal({ availability, onClose, open }) {
             {soldOut
               ? 'Actualmente no hay cupos'
               : submitting
-                ? 'Preparando pago seguro'
-                : 'Continuar a pago seguro'}
+                ? statusMessage || 'Guardando tus datos...'
+                : 'Continuar al pago'}
           </button>
         </form>
 

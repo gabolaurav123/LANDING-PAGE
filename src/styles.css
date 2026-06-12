@@ -1207,7 +1207,7 @@ img {
 
 .checkout-modal {
   position: relative;
-  width: min(100%, 520px);
+  width: min(100%, 720px);
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   border: 1px solid rgba(240, 198, 111, 0.42);
@@ -1291,6 +1291,16 @@ img {
   gap: 15px;
 }
 
+.shipping-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.form-field--wide {
+  grid-column: 1 / -1;
+}
+
 .checkout-modal label {
   display: grid;
   gap: 7px;
@@ -1317,7 +1327,8 @@ img {
   border-color: var(--gold);
 }
 
-.input-shell input {
+.input-shell input,
+.input-shell textarea {
   width: 100%;
   min-width: 0;
   border: 0;
@@ -1328,8 +1339,31 @@ img {
   text-transform: none;
 }
 
-.input-shell input::placeholder {
+.input-shell textarea {
+  min-height: 78px;
+  padding: 13px 0;
+  resize: vertical;
+}
+
+.input-shell--textarea {
+  align-items: start;
+}
+
+.input-shell--textarea svg {
+  margin-top: 14px;
+}
+
+.input-shell input::placeholder,
+.input-shell textarea::placeholder {
   color: #81796f;
+}
+
+.privacy-note,
+.form-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 .form-error {
@@ -1344,6 +1378,13 @@ img {
 
 .form-error svg {
   flex: 0 0 auto;
+}
+
+.form-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--gold-soft);
 }
 
 .checkout-submit {
@@ -1897,6 +1938,10 @@ img {
 
   .checkout-modal {
     padding: 24px 18px;
+  }
+
+  .shipping-form-grid {
+    grid-template-columns: 1fr;
   }
 
   .checkout-trust,
